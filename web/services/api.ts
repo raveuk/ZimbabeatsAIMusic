@@ -435,19 +435,27 @@ function toBackendBody(p: GenerationParams) {
   // studio. Studio is also the explicit fallback for missing values.
   const ditModel = p.ditModel === 'turbo' ? 'turbo' : 'studio';
 
+  // "Auto" slider/dropdown values arrive as 0 or empty string — translate
+  // them to undefined so the backend uses the template default. Sending
+  // bpm=0 or key="" makes ACE-Step's TextEncodeAceStepAudio1.5 node reject
+  // the prompt and the whole job gets marked as errored.
+  const num = (v: unknown) => (typeof v === 'number' && v > 0) ? v : undefined;
+  const str = (v: unknown) => (typeof v === 'string' && v.trim()) ? v : undefined;
+
   return {
     title: p.title || undefined,
     style: p.style || p.songDescription || p.prompt || '',
     lyrics: hasLyrics ? p.lyrics : (p.instrumental ? '[inst]' : ''),
-    duration: p.duration,
-    bpm: p.bpm,
-    key: p.keyScale,
-    timesignature: p.timeSignature,
-    language: p.vocalLanguage,
+    duration:       num(p.duration),
+    bpm:            num(p.bpm),
+    key:            str(p.keyScale),
+    timesignature:  str(p.timeSignature),
+    language:       str(p.vocalLanguage),
     quality,
-    steps: p.inferenceSteps,
-    temperature: p.lmTemperature,
-    seed: p.randomSeed ? undefined : p.seed,
+    steps:          num(p.inferenceSteps),
+    temperature:    typeof p.lmTemperature === 'number' ? p.lmTemperature : undefined,
+    // randomSeed=true or seed=-1 (CreatePanel's sentinel for "random") -> undefined.
+    seed: p.randomSeed ? undefined : (typeof p.seed === 'number' && p.seed >= 0 ? p.seed : undefined),
     writeLyrics,
     theme: writeLyrics ? themeFallback : undefined,
     ditModel,
