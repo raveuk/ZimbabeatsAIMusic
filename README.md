@@ -1,2 +1,2 @@
-# Zimbabeats-AI-Music
+# Zimbabeats AI Music 
 Music AI App
