@@ -4,7 +4,7 @@ import { refreshTrack, publicTrack } from "../../../lib/tracks.js";
 
 // List the current user's tracks, refreshing any still in flight.
 export const GET = handler(async (req) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const rows = db
     .prepare("SELECT * FROM tracks WHERE user_id = ? ORDER BY id DESC")
     .all(user.id);

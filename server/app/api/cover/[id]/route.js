@@ -7,7 +7,7 @@ const COMFY_URL = process.env.COMFY_URL || "http://127.0.0.1:8188";
 // Stream the cover image for one of the user's tracks. Mirrors the audio
 // endpoint but pulls the PNG from ComfyUI's /view (type=output).
 export const GET = handler(async (req, ctx) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const { id } = await ctx.params;
   let row = db.prepare("SELECT * FROM tracks WHERE id = ? AND user_id = ?").get(Number(id), user.id);
   if (!row) return json({ error: "not found" }, 404);

@@ -1,20 +1,34 @@
-// API client: token persistence + thin fetch wrapper around the backend.
-import { getItem, setItem, deleteItem } from "./storage";
+// API client: thin fetch wrapper that talks to the Next.js backend.
+// Auth is handled by Firebase — we just grab a fresh ID token from the SDK
+// and send it as `Bearer <token>`. The backend verifies it with the Admin SDK
+// and looks the user up in our SQLite by firebase_uid.
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from "firebase/auth";
+import { Platform } from "react-native";
+import { auth } from "./firebase";
 import { API_BASE } from "../config";
 
-const TOKEN_KEY = "auth_token";
-
+// Get a fresh Firebase ID token. The SDK auto-refreshes when needed.
 export async function getToken() {
-  return getItem(TOKEN_KEY);
+  const user = auth.currentUser;
+  if (!user) return null;
+  try { return await user.getIdToken(); } catch { return null; }
 }
+// Kept for backwards-compat with screens that still call setToken(null) on
+// logout — we just sign out of Firebase, the persistence layer clears itself.
 export async function setToken(token) {
-  if (token) await setItem(TOKEN_KEY, token);
-  else await deleteItem(TOKEN_KEY);
+  if (!token) { try { await signOut(auth); } catch {} }
 }
 
-async function request(path, { method = "GET", body, auth = true } = {}) {
+async function request(path, { method = "GET", body, sendAuth = true } = {}) {
   const headers = { "content-type": "application/json" };
-  if (auth) {
+  if (sendAuth) {
     const token = await getToken();
     if (token) headers.authorization = `Bearer ${token}`;
   }
@@ -28,15 +42,39 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
   return data;
 }
 
+// Firebase-backed auth actions. They return the same shape as before
+// ({ user, token }) so LoginScreen doesn't need to know which provider auth'd.
+async function fbLogin(email, password) {
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  const token = await cred.user.getIdToken();
+  const me = await request("/api/me");
+  return { user: me.user, token };
+}
+async function fbRegister(email, password) {
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  const token = await cred.user.getIdToken();
+  const me = await request("/api/me");
+  return { user: me.user, token };
+}
+async function fbForgot(email) {
+  await sendPasswordResetEmail(auth, email);
+  return { ok: true };
+}
+async function fbGoogle() {
+  if (Platform.OS !== "web") throw new Error("Google sign-in is only available on the web build for now.");
+  const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+  const token = await cred.user.getIdToken();
+  const me = await request("/api/me");
+  return { user: me.user, token };
+}
+
 export const api = {
-  register: (email, password) =>
-    request("/api/auth/register", { method: "POST", auth: false, body: { email, password } }),
-  login: (email, password) =>
-    request("/api/auth/login", { method: "POST", auth: false, body: { email, password } }),
-  forgot: (email) =>
-    request("/api/auth/forgot", { method: "POST", auth: false, body: { email } }),
-  options: () => request("/api/options", { auth: false }),
-  voices: () => request("/api/voices", { auth: false }),
+  register: fbRegister,
+  login: fbLogin,
+  forgot: fbForgot,
+  google: fbGoogle,
+  options: () => request("/api/options", { sendAuth: false }),
+  voices: () => request("/api/voices", { sendAuth: false }),
   writeLyrics: (theme, language) => request("/api/lyrics", { method: "POST", body: { theme, language } }),
   generate: (params) => request("/api/generate", { method: "POST", body: params }),
   jobs: () => request("/api/jobs"),

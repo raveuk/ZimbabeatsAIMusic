@@ -8,7 +8,7 @@ import { deleteOutputFile, titleSlug } from "../../../../../lib/files.js";
 // disk and submits a fresh SDXL prompt with a new seed. The next /api/jobs
 // poll will pick up the new cover and the UI swaps it in.
 export const POST = handler(async (req, ctx) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   if (!coverAvailable()) return json({ error: "cover not configured" }, 500);
 
   const { id } = await ctx.params;

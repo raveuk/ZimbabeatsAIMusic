@@ -3,7 +3,7 @@ import { requireUser, json, handler } from "../../../lib/api.js";
 
 // List the user's playlists with a track count.
 export const GET = handler(async (req) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const rows = db
     .prepare(`
       SELECT p.id, p.name, p.created_at,
@@ -16,7 +16,7 @@ export const GET = handler(async (req) => {
 
 // Create a playlist.
 export const POST = handler(async (req) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const { name } = await req.json();
   const trimmed = (name || "").trim();
   if (!trimmed) return json({ error: "name required" }, 400);

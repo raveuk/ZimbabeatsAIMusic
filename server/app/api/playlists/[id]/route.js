@@ -8,7 +8,7 @@ function ownedPlaylist(userId, id) {
 
 // Playlist detail with its tracks (in the order they were added).
 export const GET = handler(async (req, ctx) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const { id } = await ctx.params;
   const pl = ownedPlaylist(user.id, id);
   if (!pl) return json({ error: "not found" }, 404);
@@ -27,7 +27,7 @@ export const GET = handler(async (req, ctx) => {
 
 // Delete a playlist (its track memberships cascade; the tracks themselves stay).
 export const DELETE = handler(async (req, ctx) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const { id } = await ctx.params;
   const info = db.prepare("DELETE FROM playlists WHERE id = ? AND user_id = ?").run(Number(id), user.id);
   if (info.changes === 0) return json({ error: "not found" }, 404);

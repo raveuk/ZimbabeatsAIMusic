@@ -4,7 +4,7 @@ import { refreshTrack, publicTrack } from "../../../../lib/tracks.js";
 import { deleteOutputFile } from "../../../../lib/files.js";
 
 export const GET = handler(async (req, ctx) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const { id } = await ctx.params;
   const row = db.prepare("SELECT * FROM tracks WHERE id = ? AND user_id = ?").get(Number(id), user.id);
   if (!row) return json({ error: "not found" }, 404);
@@ -14,7 +14,7 @@ export const GET = handler(async (req, ctx) => {
 // Delete a track: removes the DB row (cascading out of all playlists) and
 // deletes the generated mp3 from ComfyUI's output directory on disk.
 export const DELETE = handler(async (req, ctx) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const { id } = await ctx.params;
   const row = db.prepare("SELECT * FROM tracks WHERE id = ? AND user_id = ?").get(Number(id), user.id);
   if (!row) return json({ error: "not found" }, 404);

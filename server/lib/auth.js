@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { db } from "./db.js";
+import { verifyFirebaseIdToken } from "./firebase-admin.js";
 
 // Persist a JWT secret so tokens survive restarts. Override with JWT_SECRET env.
 function loadSecret() {
@@ -85,19 +86,67 @@ export function consumeResetToken(token, newPassword) {
 }
 
 // Pull the user from an Authorization: Bearer <token> header, OR from a
-// ?token=<jwt> query param. The query-param path exists for native <Image>
-// loaders that can't reliably attach auth headers — used by /api/cover.
-export function userFromRequest(req) {
-  const auth = req.headers.get("authorization") || "";
-  let token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+// ?token=<…> query param. The query-param path exists for native <Image>
+// loaders that can't reliably attach auth headers — used by /api/cover and audio.
+//
+// Tokens can be either:
+//   1. A Firebase ID token (new — minted by the client SDK after sign-in).
+//      We verify it with the Admin SDK and look the user up by firebase_uid,
+//      auto-linking by email + creating a row on first encounter.
+//   2. A legacy HS256 JWT (old — minted by signToken() before the migration).
+//      Still accepted so existing logged-in sessions don't get bumped out.
+export async function userFromRequest(req) {
+  const authHeader = req.headers.get("authorization") || "";
+  let token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!token) {
     try { token = new URL(req.url).searchParams.get("token"); } catch {}
   }
+  if (!token) return null;
+
+  // First try Firebase. Tokens are JWTs but signed with Google's keys, so the
+  // legacy verifyToken() returns null for them — no false-positive risk.
+  const fb = await verifyFirebaseIdToken(token);
+  if (fb?.uid && fb.email) {
+    return upsertFirebaseUser(fb);
+  }
+
+  // Fallback: legacy HS256 token from the pre-migration auth flow.
   const payload = verifyToken(token);
   if (!payload?.uid) return null;
   return db
-    .prepare("SELECT id, email, role, disabled, track_quota FROM users WHERE id = ?")
+    .prepare("SELECT id, email, role, disabled, track_quota, firebase_uid FROM users WHERE id = ?")
     .get(payload.uid) ?? null;
+}
+
+// First-encounter handling: link an existing email-matched row to the
+// Firebase UID, or create a fresh row if the email is brand new. Either way
+// returns the same shape as the SELECT in userFromRequest.
+function upsertFirebaseUser(fb) {
+  const byUid = db
+    .prepare("SELECT id, email, role, disabled, track_quota, firebase_uid FROM users WHERE firebase_uid = ?")
+    .get(fb.uid);
+  if (byUid) return byUid;
+
+  const byEmail = db
+    .prepare("SELECT id, email, role, disabled, track_quota, firebase_uid FROM users WHERE email = ?")
+    .get(fb.email);
+  if (byEmail) {
+    // Existing local account — link it. Preserves track_quota, role, history.
+    db.prepare("UPDATE users SET firebase_uid = ? WHERE id = ?").run(fb.uid, byEmail.id);
+    return { ...byEmail, firebase_uid: fb.uid };
+  }
+
+  // Brand-new user. Insert with a sentinel password_hash since the column is
+  // NOT NULL (and we don't store real passwords anymore — Firebase does).
+  const info = db
+    .prepare(
+      "INSERT INTO users (email, password_hash, firebase_uid) VALUES (?, '__firebase__', ?)"
+    )
+    .run(fb.email, fb.uid);
+  ensureAdminRole({ id: info.lastInsertRowid, email: fb.email, role: "user" });
+  return db
+    .prepare("SELECT id, email, role, disabled, track_quota, firebase_uid FROM users WHERE id = ?")
+    .get(info.lastInsertRowid);
 }
 
 // If the configured ADMIN_EMAIL matches a user, make sure they're marked admin.

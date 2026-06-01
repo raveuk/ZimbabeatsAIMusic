@@ -6,7 +6,7 @@ import { titleSlug } from "../../../lib/files.js";
 import { generateLyrics } from "../../../lib/ollama.js";
 
 export const POST = handler(async (req) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const body = await req.json();
   const writeLyrics = !!body.writeLyrics;
   if (!body.style && !body.lyrics && !(writeLyrics && body.theme)) {

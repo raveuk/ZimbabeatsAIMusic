@@ -6,7 +6,7 @@ import { deleteOutputFile } from "../../../../../lib/files.js";
 // Admin: change a user's role and/or set a new password.
 //   body: { role?: 'admin'|'user', password?: string }
 export const PATCH = handler(async (req, ctx) => {
-  const admin = requireAdmin(req);
+  const admin = await requireAdmin(req);
   const { id } = await ctx.params;
   const uid = Number(id);
   const target = db.prepare("SELECT id, email FROM users WHERE id = ?").get(uid);
@@ -44,7 +44,7 @@ export const PATCH = handler(async (req, ctx) => {
 // Admin: delete a user and all their data (tracks + cover files on disk +
 // playlists). The playlist_tracks table cascades automatically.
 export const DELETE = handler(async (req, ctx) => {
-  const admin = requireAdmin(req);
+  const admin = await requireAdmin(req);
   const { id } = await ctx.params;
   const uid = Number(id);
   if (uid === admin.id) return json({ error: "you can't delete your own account" }, 400);

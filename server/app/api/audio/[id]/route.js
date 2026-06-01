@@ -10,7 +10,7 @@ import { readOutputFile } from "../../../../lib/files.js";
 // files straight off disk (we're on the same machine as ComfyUI), fall back to
 // ComfyUI's /view if the disk read fails.
 export const GET = handler(async (req, ctx) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const { id } = await ctx.params;
   let row = db.prepare("SELECT * FROM tracks WHERE id = ? AND user_id = ?").get(Number(id), user.id);
   if (!row) return json({ error: "not found" }, 404);

@@ -3,7 +3,7 @@ import { requireUser, json, handler } from "../../../../../lib/api.js";
 
 // Add one of the user's tracks to one of the user's playlists.
 export const POST = handler(async (req, ctx) => {
-  const user = requireUser(req);
+  const user = await requireUser(req);
   const { id } = await ctx.params;
   const { trackId } = await req.json();
 

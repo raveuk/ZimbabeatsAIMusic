@@ -4,7 +4,7 @@ import { generateLyrics } from "../../../lib/ollama.js";
 // Preview lyrics from a theme WITHOUT creating a track or touching the GPU.
 // Lets the app show (and let the user edit) the lyrics before generating music.
 export const POST = handler(async (req) => {
-  requireUser(req);
+  await requireUser(req);
   const { theme, language } = await req.json();
   console.log(`[lyrics] theme="${String(theme || "").slice(0, 40)}" language=${JSON.stringify(language)}`);
   if (!theme || !String(theme).trim()) return json({ error: "enter a theme first" }, 400);
