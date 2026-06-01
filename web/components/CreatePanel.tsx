@@ -1296,11 +1296,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                       : (<><Sparkles size={12} /> {lyrics ? 'Regenerate' : 'Write lyrics'}</>)}
                   </button>
                 </div>
+                {/* Read-only in Simple mode — the box shows AI-generated
+                    lyrics only. Users who want to type their own switch to
+                    Custom mode (which has the full editable lyric editor). */}
                 <textarea
                   value={lyrics}
-                  onChange={(e) => setLyrics(e.target.value)}
-                  placeholder="Tap “Write lyrics” to generate from the description above, or type your own. These exact lyrics get used when you Create."
-                  className="w-full h-40 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-y font-mono"
+                  readOnly
+                  placeholder="Tap “Write lyrics” to generate lyrics from the description above. To write your own, switch to Custom mode."
+                  className="w-full h-40 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-y font-mono cursor-default"
                 />
               </div>
             )}
