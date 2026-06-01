@@ -191,15 +191,20 @@ function toFspeciiSong(t: BackendTrack, currentUser?: User | null): Song {
   const id = String(t.id);
   const audioRel = t.audioUrl;
   const coverRel = t.coverUrl;
+  // Pre-sign URLs with the current token so <audio>/<img> tags can hit our
+  // authenticated endpoints without setting Authorization headers (browsers
+  // don't expose that for native media loaders).
+  const audioSigned = audioRel ? withSignedToken(`${API_BASE}${audioRel}`) : undefined;
+  const coverSigned = coverRel ? withSignedToken(`${API_BASE}${coverRel}`) : undefined;
   return {
     id,
     title: t.title || `Track #${t.id}`,
     lyrics: String(t.params.lyrics || ''),
     style: String(t.params.style || ''),
     caption: undefined,
-    cover_url: coverRel ? `${API_BASE}${coverRel}` : undefined,
-    audio_url: audioRel ? `${API_BASE}${audioRel}` : undefined,
-    audioUrl:  audioRel ? `${API_BASE}${audioRel}` : undefined,
+    cover_url: coverSigned,
+    audio_url: audioSigned,
+    audioUrl:  audioSigned,
     duration: typeof t.params.duration === 'number' ? t.params.duration : undefined,
     bpm: typeof t.params.bpm === 'number' ? t.params.bpm : undefined,
     key_scale: typeof t.params.key === 'string' ? t.params.key : undefined,
@@ -217,8 +222,19 @@ function toFspeciiSong(t: BackendTrack, currentUser?: User | null): Song {
 }
 
 let _currentUserCache: User | null = null;
+let _currentTokenCache: string | null = null;
 export function _setCurrentUserForSongMapper(u: User | null) { _currentUserCache = u; }
+export function _setCurrentTokenForSongMapper(t: string | null) { _currentTokenCache = t; }
 function ctx() { return _currentUserCache; }
+
+// Append the current Firebase ID token to a backend URL so vanilla
+// <audio>/<img> tags (which can't set Authorization headers) authenticate via
+// query string. Picks the right separator (?/&) for existing query params.
+function withSignedToken(url: string | undefined): string | undefined {
+  if (!url || !_currentTokenCache) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}token=${encodeURIComponent(_currentTokenCache)}`;
+}
 
 export const songsApi = {
   // Library list — backed by /api/jobs.
@@ -432,7 +448,7 @@ function toGenerationJob(t: BackendTrack): GenerationJob {
     params: t.params,
     created_at: t.createdAt,
     result: t.audioUrl ? {
-      audioUrls: [`${API_BASE}${t.audioUrl}`],
+      audioUrls: [withSignedToken(`${API_BASE}${t.audioUrl}`)!],
       duration: typeof t.params.duration === 'number' ? t.params.duration : undefined,
       bpm:      typeof t.params.bpm === 'number' ? t.params.bpm : undefined,
       keyScale: typeof t.params.key === 'string' ? t.params.key : undefined,

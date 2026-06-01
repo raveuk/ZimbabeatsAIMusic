@@ -2,13 +2,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
-  onAuthStateChanged,
+  onIdTokenChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
-import { authApi, User, _setCurrentUserForSongMapper } from '../services/api';
+import { authApi, User, _setCurrentUserForSongMapper, _setCurrentTokenForSongMapper } from '../services/api';
 import { auth as firebaseAuth } from '../services/firebase';
 
 // AuthContext that surfaces Firebase sign-in to fspecii's existing UI.
@@ -50,18 +50,23 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
   // Single source of truth: Firebase auth state. When sign-in completes,
   // /api/me will see the token and either return the linked SQLite row or
   // create one on the fly (handled server-side in upsertFirebaseUser).
+  // onIdTokenChanged fires on sign-in/sign-out AND when Firebase auto-refreshes
+  // the ID token (~hourly). Subscribing here keeps the cached token used for
+  // signed audio/cover URLs perpetually fresh without us having to poll.
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebaseAuth, async (fbUser) => {
+    const unsub = onIdTokenChanged(firebaseAuth, async (fbUser) => {
       if (!fbUser) {
         setUser(null);
         setToken(null);
         _setCurrentUserForSongMapper(null);
+        _setCurrentTokenForSongMapper(null);
         setIsLoading(false);
         return;
       }
       try {
         const idToken = await fbUser.getIdToken();
         setToken(idToken);
+        _setCurrentTokenForSongMapper(idToken);
         const { user: backendUser } = await authApi.me();
         setUser(backendUser);
         _setCurrentUserForSongMapper(backendUser);
@@ -70,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
         setUser(null);
         setToken(null);
         _setCurrentUserForSongMapper(null);
+        _setCurrentTokenForSongMapper(null);
       } finally {
         setIsLoading(false);
       }
