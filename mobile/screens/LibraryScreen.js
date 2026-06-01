@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
-import { Text, TouchableOpacity, Alert } from "react-native";
-import TrackList, { actionStyles } from "../components/TrackList";
+import { Text, TouchableOpacity, Alert, StyleSheet } from "react-native";
+import TrackGrid from "../components/TrackGrid";
 import AddToPlaylistModal from "../components/AddToPlaylistModal";
 import TrackDetailModal from "../components/TrackDetailModal";
 import { api } from "../lib/api";
+import { colors, space, radius, typography } from "../lib/theme";
 
 export default function LibraryScreen() {
   const [tracks, setTracks] = useState([]);
@@ -85,14 +86,14 @@ export default function LibraryScreen() {
     if (track.status !== "done") return null;
     return (
       <>
-        <TouchableOpacity style={actionStyles.iconBtn} onPress={() => regenerateCover(track)}>
-          <Text style={actionStyles.icon}>🎨</Text>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => regenerateCover(track)}>
+          <Text style={styles.actionIcon}>🎨</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={actionStyles.iconBtn} onPress={() => setAddTarget(track.id)}>
-          <Text style={actionStyles.icon}>➕</Text>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => setAddTarget(track.id)}>
+          <Text style={styles.actionIcon}>➕</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={actionStyles.iconBtn} onPress={() => confirmDelete(track)}>
-          <Text style={actionStyles.icon}>🗑️</Text>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => confirmDelete(track)}>
+          <Text style={styles.actionIcon}>🗑️</Text>
         </TouchableOpacity>
       </>
     );
@@ -100,10 +101,10 @@ export default function LibraryScreen() {
 
   return (
     <>
-      <TrackList
+      <TrackGrid
         tracks={loading ? [] : tracks}
         header="Library"
-        emptyText={loading ? "Loading…" : "No tracks yet. Create one!"}
+        emptyText={loading ? "Loading…" : "No tracks yet — head to Create."}
         refreshing={refreshing}
         onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}
         renderActions={renderActions}
@@ -118,3 +119,8 @@ export default function LibraryScreen() {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  actionBtn: { paddingHorizontal: space.xs, paddingVertical: space.xxs },
+  actionIcon: { fontSize: 16 },
+});

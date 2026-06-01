@@ -6,6 +6,7 @@ import Slider from "@react-native-community/slider";
 import Dropdown from "../components/Dropdown";
 import { api } from "../lib/api";
 import { languageLabel } from "../lib/labels";
+import { colors, space, radius, typography } from "../lib/theme";
 
 export default function CreateScreen({ onCreated }) {
   const [title, setTitle] = useState("");
@@ -112,7 +113,7 @@ export default function CreateScreen({ onCreated }) {
       <Text style={styles.h1}>New track</Text>
 
       <Text style={styles.label}>Title (optional)</Text>
-      <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="My song" placeholderTextColor="#888" />
+      <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="My song" placeholderTextColor={colors.textFade} />
 
       <Text style={styles.label}>Style / genre</Text>
       <TextInput
@@ -123,7 +124,7 @@ export default function CreateScreen({ onCreated }) {
 drums, airy synth pads, rolling bassline, tight vocal stacks and
 harmonies. Tender verses building to a full, soulful chorus. Clean
 production, smooth male/female lead vocal, 75 BPM, key of A major."
-        placeholderTextColor="#888"
+        placeholderTextColor={colors.textFade}
         multiline
       />
 
@@ -139,11 +140,11 @@ production, smooth male/female lead vocal, 75 BPM, key of A major."
             value={theme}
             onChangeText={setTheme}
             placeholder="e.g. a road trip with friends in the summer"
-            placeholderTextColor="#888"
+            placeholderTextColor={colors.textFade}
             multiline
           />
           <TouchableOpacity style={styles.secondaryBtn} onPress={writeLyricsNow} disabled={writing}>
-            {writing ? <ActivityIndicator color="#8a7cff" /> : (
+            {writing ? <ActivityIndicator color={colors.accent} /> : (
               <Text style={styles.secondaryText}>{draftLyrics ? "↻ Rewrite lyrics" : "✍️ Write lyrics"}</Text>
             )}
           </TouchableOpacity>
@@ -154,7 +155,7 @@ production, smooth male/female lead vocal, 75 BPM, key of A major."
                 style={[styles.input, styles.multilineTall]}
                 value={draftLyrics}
                 onChangeText={setDraftLyrics}
-                placeholderTextColor="#888"
+                placeholderTextColor={colors.textFade}
                 multiline
               />
               <Text style={styles.hint}>These exact lyrics will be used. Edit, rewrite, or generate music below.</Text>
@@ -171,7 +172,7 @@ production, smooth male/female lead vocal, 75 BPM, key of A major."
             value={lyrics}
             onChangeText={setLyrics}
             placeholder={"[verse]\n...\n[chorus]\n...\n\n(or leave blank / type [inst] for instrumental)"}
-            placeholderTextColor="#888"
+            placeholderTextColor={colors.textFade}
             multiline
           />
         </>
@@ -213,9 +214,9 @@ production, smooth male/female lead vocal, 75 BPM, key of A major."
         step={5}
         value={duration}
         onValueChange={setDuration}
-        minimumTrackTintColor="#6d5cff"
-        maximumTrackTintColor="#333"
-        thumbTintColor="#8a7cff"
+        minimumTrackTintColor={colors.accent}
+        maximumTrackTintColor={colors.surface3}
+        thumbTintColor={colors.accent}
       />
 
       <View style={styles.row}>
@@ -223,7 +224,7 @@ production, smooth male/female lead vocal, 75 BPM, key of A major."
         <Switch value={randomSeed} onValueChange={setRandomSeed} />
       </View>
       {!randomSeed && (
-        <TextInput style={styles.input} value={seed} onChangeText={setSeed} placeholder="seed (number)" keyboardType="number-pad" placeholderTextColor="#888" />
+        <TextInput style={styles.input} value={seed} onChangeText={setSeed} placeholder="seed (number)" keyboardType="number-pad" placeholderTextColor={colors.textFade} />
       )}
 
       <TouchableOpacity onPress={() => setShowAdvanced(!showAdvanced)}>
@@ -232,7 +233,7 @@ production, smooth male/female lead vocal, 75 BPM, key of A major."
       {showAdvanced && (
         <View>
           <Text style={styles.label}>BPM</Text>
-          <TextInput style={styles.input} value={bpm} onChangeText={setBpm} placeholder="10–300 (blank = default)" keyboardType="number-pad" placeholderTextColor="#888" />
+          <TextInput style={styles.input} value={bpm} onChangeText={setBpm} placeholder="10–300 (blank = default)" keyboardType="number-pad" placeholderTextColor={colors.textFade} />
           <Text style={styles.label}>Key / scale</Text>
           <Dropdown selectedValue={key} onValueChange={setKey} items={keyItems} />
           <Text style={styles.label}>Time signature</Text>
@@ -245,9 +246,9 @@ production, smooth male/female lead vocal, 75 BPM, key of A major."
             step={1}
             value={steps}
             onValueChange={(v) => { setSteps(v); setStepsTouched(true); }}
-            minimumTrackTintColor="#6d5cff"
-            maximumTrackTintColor="#333"
-            thumbTintColor="#8a7cff"
+            minimumTrackTintColor={colors.accent}
+            maximumTrackTintColor={colors.surface3}
+            thumbTintColor={colors.accent}
           />
           <Text style={styles.hint}>More steps = better clarity, slower generation. 30 is balanced; 40+ for studio.</Text>
 
@@ -258,33 +259,48 @@ production, smooth male/female lead vocal, 75 BPM, key of A major."
             step={0.05}
             value={temperature}
             onValueChange={(v) => { setTemperature(v); setTempTouched(true); }}
-            minimumTrackTintColor="#6d5cff"
-            maximumTrackTintColor="#333"
-            thumbTintColor="#8a7cff"
+            minimumTrackTintColor={colors.accent}
+            maximumTrackTintColor={colors.surface3}
+            thumbTintColor={colors.accent}
           />
           <Text style={styles.hint}>Lower = more confident pronunciation (crisper). Higher = more expressive but mushier.</Text>
         </View>
       )}
 
       <TouchableOpacity style={styles.button} onPress={submit} disabled={busy}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Generate 🎶</Text>}
+        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Generate track</Text>}
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f0f14", padding: 20 },
-  h1: { fontSize: 26, fontWeight: "700", color: "#fff", marginBottom: 16 },
-  label: { color: "#aaa", marginTop: 14, marginBottom: 6, fontSize: 14 },
-  input: { backgroundColor: "#1c1c26", color: "#fff", borderRadius: 12, padding: 14, fontSize: 15 },
-  multiline: { minHeight: 70, textAlignVertical: "top" },
-  hint: { color: "#666", fontSize: 12, marginTop: 6, fontStyle: "italic" },
-  multilineTall: { minHeight: 140, textAlignVertical: "top" },
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
-  advanced: { color: "#8a7cff", marginTop: 20, fontSize: 15 },
-  secondaryBtn: { borderWidth: 1, borderColor: "#6d5cff", borderRadius: 12, padding: 14, alignItems: "center", marginTop: 12 },
-  secondaryText: { color: "#8a7cff", fontSize: 15, fontWeight: "600" },
-  button: { backgroundColor: "#6d5cff", borderRadius: 12, padding: 18, alignItems: "center", marginTop: 28 },
-  buttonText: { color: "#fff", fontSize: 17, fontWeight: "700" },
+  container: { flex: 1, backgroundColor: colors.bg, padding: space.lg },
+  h1: { ...typography.h1, color: colors.text, marginBottom: space.lg },
+  label: { ...typography.meta, color: colors.textMute, marginTop: space.md, marginBottom: space.xs },
+  input: {
+    backgroundColor: colors.surface2,
+    color: colors.text,
+    borderRadius: radius.md,
+    paddingHorizontal: space.md,
+    paddingVertical: 13,
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  multiline: { minHeight: 76, textAlignVertical: "top" },
+  hint: { ...typography.caption, color: colors.textFade, marginTop: space.xs, fontStyle: "italic" },
+  multilineTall: { minHeight: 150, textAlignVertical: "top" },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: space.md },
+  advanced: { ...typography.body, color: colors.accent, marginTop: space.xl, fontWeight: "700" },
+  secondaryBtn: {
+    borderWidth: 1, borderColor: colors.accent, borderRadius: radius.pill,
+    paddingVertical: 14, paddingHorizontal: space.lg, alignItems: "center", marginTop: space.md,
+  },
+  secondaryText: { ...typography.body, color: colors.accent, fontWeight: "700" },
+  button: {
+    backgroundColor: colors.accent, borderRadius: radius.pill,
+    paddingVertical: 16, alignItems: "center", marginTop: space.xxl,
+  },
+  buttonText: { color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: 0.3 },
 });
