@@ -2,10 +2,10 @@
 // session token retrieval. The values here are public (Firebase relies on
 // security rules + the API key's auth-domain restriction, not on hiding them).
 import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import {
   initializeAuth,
   getReactNativePersistence,
-  browserLocalPersistence,
   inMemoryPersistence,
 } from "firebase/auth";
 import { Platform } from "react-native";
@@ -22,21 +22,24 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Persistence: web uses localStorage, native wires a tiny adapter on top of
-// our existing SecureStore-backed shim so the session survives app restarts.
-const nativeAdapter = {
-  getItem: (k) => getItem(k),
-  setItem: (k, v) => setItem(k, v),
-  removeItem: (k) => deleteItem(k),
-};
-
-export const auth = initializeAuth(app, {
-  persistence:
-    Platform.OS === "web"
-      ? browserLocalPersistence
-      : (typeof getReactNativePersistence === "function"
-          ? getReactNativePersistence(nativeAdapter)
-          : inMemoryPersistence),
-});
-
+// Web uses the default getAuth() — Firebase picks indexedDB persistence
+// automatically and wires popup/redirect flows correctly. initializeAuth()
+// is for native, where we hand it our SecureStore-backed storage shim.
+let _auth;
+if (Platform.OS === "web") {
+  _auth = getAuth(app);
+} else {
+  const nativeAdapter = {
+    getItem: (k) => getItem(k),
+    setItem: (k, v) => setItem(k, v),
+    removeItem: (k) => deleteItem(k),
+  };
+  _auth = initializeAuth(app, {
+    persistence:
+      typeof getReactNativePersistence === "function"
+        ? getReactNativePersistence(nativeAdapter)
+        : inMemoryPersistence,
+  });
+}
+export const auth = _auth;
 export default app;
