@@ -1262,9 +1262,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             </div>
 
             {/* Song Description */}
-            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
-              <div className="px-3 py-2.5 flex items-center justify-between border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                <span className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            <div className="bg-white dark:bg-suno-card rounded-lg border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-1.5 flex items-center justify-between border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                   {t('describeYourSong')}
                 </span>
                 <button
@@ -1290,7 +1290,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 value={songDescription}
                 onChange={(e) => setSongDescription(e.target.value)}
                 placeholder={t('songDescriptionPlaceholder')}
-                className="w-full h-32 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
+                className="w-full h-24 bg-transparent px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
               />
             </div>
 
@@ -1299,9 +1299,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 Ollama-backed /api/lyrics. They can edit + regenerate before
                 hitting Create N Songs. Hidden when Instrumental is on. */}
             {!instrumental && (
-              <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
-                <div className="px-3 py-2.5 flex items-center justify-between border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                  <span className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              <div className="bg-white dark:bg-suno-card rounded-lg border border-zinc-200 dark:border-white/5 overflow-hidden">
+                <div className="px-3 py-1.5 flex items-center justify-between border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                     Lyrics
                   </span>
                   <button
@@ -1323,29 +1323,29 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   value={lyrics}
                   readOnly
                   placeholder="Tap “Write lyrics” to generate lyrics from the description above. To write your own, switch to Custom mode."
-                  className="w-full h-40 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-y font-mono cursor-default"
+                  className="w-full h-32 bg-transparent px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-y font-mono cursor-default"
                 />
               </div>
             )}
 
             {/* Vocal Language (Simple) */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide px-1">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider px-1">
                   {t('vocalLanguage')}
                 </label>
                 <select
                   value={vocalLanguage}
                   onChange={(e) => setVocalLanguage(e.target.value)}
-                  className="w-full bg-white dark:bg-suno-card border border-zinc-200 dark:border-white/5 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
+                  className="w-full bg-white dark:bg-suno-card border border-zinc-200 dark:border-white/5 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                 >
                   {VOCAL_LANGUAGE_KEYS.map(lang => (
                     <option key={lang.value} value={lang.value}>{t(lang.key)}</option>
                   ))}
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide px-1">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider px-1">
                   {t('vocalGender')}
                 </label>
                 <div className="flex items-center gap-1.5">
@@ -1376,8 +1376,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             </div>
 
             {/* Quick Settings (Simple Mode) */}
-            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
-              <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-2">
+            <div className="bg-white dark:bg-suno-card rounded-lg border border-zinc-200 dark:border-white/5 p-3 space-y-4">
+              <h3 className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-2">
                 <Sliders size={14} />
                 {t('quickSettings')}
               </h3>
