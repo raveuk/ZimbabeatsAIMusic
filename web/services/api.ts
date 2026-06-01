@@ -459,7 +459,10 @@ function toBackendBody(p: GenerationParams) {
   return {
     title: p.title || undefined,
     style: p.style || p.songDescription || p.prompt || '',
-    lyrics: hasLyrics ? p.lyrics : (p.instrumental ? '[inst]' : ''),
+    // Instrumental wins regardless of whatever's in the lyrics box — flipping
+    // the toggle ON means "no vocals" even if the box still has leftover text.
+    // ACE-Step treats '[inst]' as the signal for an instrumental-only track.
+    lyrics: p.instrumental ? '[inst]' : (hasLyrics ? p.lyrics : ''),
     duration:       num(p.duration),
     bpm:            num(p.bpm),
     key:            str(p.keyScale),
