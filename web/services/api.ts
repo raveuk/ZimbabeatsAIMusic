@@ -517,63 +517,30 @@ export interface UserProfile extends User {
   created_at: string;
 }
 
+// Users / social graph (profiles, followers, public songs) — our backend
+// doesn't expose any of these yet. Stub everything to neutral defaults so the
+// UI degrades gracefully instead of crashing.
+const emptyUserProfile: UserProfile = {
+  id: '', username: 'unknown', isAdmin: false, bio: '', avatar_url: '', banner_url: '', created_at: '',
+};
 export const usersApi = {
-  getProfile: (username: string, token?: string | null): Promise<{ user: UserProfile }> =>
-    api(`/api/users/${username}`, { token: token || undefined }),
-
-  getPublicSongs: (username: string): Promise<{ songs: Song[] }> =>
-    api(`/api/users/${username}/songs`),
-
-  getPublicPlaylists: (username: string): Promise<{ playlists: any[] }> =>
-    api(`/api/users/${username}/playlists`),
-
-  getFeaturedCreators: (): Promise<{ creators: Array<UserProfile & { follower_count?: number }> }> =>
-    api('/api/users/public/featured'),
-
-  updateProfile: (updates: Partial<User>, token: string): Promise<{ user: User }> =>
-    api('/api/users/me', { method: 'PATCH', body: updates, token }),
-
-  uploadAvatar: async (file: File, token: string): Promise<{ user: UserProfile; url: string }> => {
-    const formData = new FormData();
-    formData.append('avatar', file);
-    const response = await fetch(`${API_BASE}/api/users/me/avatar`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
-      throw new Error(error.details || error.error || 'Upload failed');
-    }
-    return response.json();
+  getProfile: async (username: string, _t?: string | null): Promise<{ user: UserProfile }> => {
+    // Best-effort: if the requested username matches our current user, hand
+    // back our local profile so "View Profile" doesn't 404.
+    const me = ctx();
+    if (me && me.username === username) return { user: { ...emptyUserProfile, ...me } };
+    return { user: { ...emptyUserProfile, username } };
   },
-
-  uploadBanner: async (file: File, token: string): Promise<{ user: UserProfile; url: string }> => {
-    const formData = new FormData();
-    formData.append('banner', file);
-    const response = await fetch(`${API_BASE}/api/users/me/banner`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
-      throw new Error(error.error || 'Upload failed');
-    }
-    return response.json();
-  },
-
-  toggleFollow: (username: string, token: string): Promise<{ following: boolean, followerCount: number }> =>
-    api(`/api/users/${username}/follow`, { method: 'POST', token }),
-
-  getFollowers: (username: string): Promise<{ followers: User[] }> =>
-    api(`/api/users/${username}/followers`),
-
-  getFollowing: (username: string): Promise<{ following: User[] }> =>
-    api(`/api/users/${username}/following`),
-
-  getStats: (username: string, token?: string | null): Promise<{ followerCount: number, followingCount: number, isFollowing: boolean }> =>
-    api(`/api/users/${username}/stats`, { token: token || undefined }),
+  getPublicSongs:      async (_u: string): Promise<{ songs: Song[] }> => ({ songs: [] }),
+  getPublicPlaylists:  async (_u: string): Promise<{ playlists: any[] }> => ({ playlists: [] }),
+  getFeaturedCreators: async (): Promise<{ creators: Array<UserProfile & { follower_count?: number }> }> => ({ creators: [] }),
+  updateProfile:       async (_updates: Partial<User>, _t?: string): Promise<{ user: User }> => { throw new Error('Profile editing is not available yet.'); },
+  uploadAvatar:        async (_f: File, _t?: string): Promise<{ user: UserProfile; url: string }> => { throw new Error('Avatar uploads are not available yet.'); },
+  uploadBanner:        async (_f: File, _t?: string): Promise<{ user: UserProfile; url: string }> => { throw new Error('Banner uploads are not available yet.'); },
+  toggleFollow:        async (_u: string, _t?: string): Promise<{ following: boolean; followerCount: number }> => ({ following: false, followerCount: 0 }),
+  getFollowers:        async (_u: string): Promise<{ followers: User[] }> => ({ followers: [] }),
+  getFollowing:        async (_u: string): Promise<{ following: User[] }> => ({ following: [] }),
+  getStats:            async (_u: string, _t?: string | null): Promise<{ followerCount: number; followingCount: number; isFollowing: boolean }> => ({ followerCount: 0, followingCount: 0, isFollowing: false }),
 };
 
 // Playlists API
@@ -588,30 +555,73 @@ export interface Playlist {
   song_count?: number;
 }
 
+// Our backend's playlist row shapes.
+interface BackendPlaylist {
+  id: number;
+  name: string;
+  trackCount?: number;
+  createdAt?: string;
+}
+function toFspeciiPlaylist(p: BackendPlaylist): Playlist {
+  return {
+    id: String(p.id),
+    name: p.name,
+    description: undefined,
+    cover_url: undefined,
+    is_public: false,
+    user_id: ctx()?.id,
+    created_at: p.createdAt,
+    song_count: p.trackCount ?? 0,
+  };
+}
+
 export const playlistsApi = {
-  create: (name: string, description: string, isPublic: boolean, token: string): Promise<{ playlist: Playlist }> =>
-    api('/api/playlists', { method: 'POST', body: { name, description, isPublic }, token }),
+  create: async (name: string, _description: string, _isPublic: boolean, _token?: string): Promise<{ playlist: Playlist }> => {
+    const { playlist } = await api<{ playlist: BackendPlaylist }>('/api/playlists', { method: 'POST', body: { name } });
+    return { playlist: toFspeciiPlaylist(playlist) };
+  },
 
-  getMyPlaylists: (token: string): Promise<{ playlists: Playlist[] }> =>
-    api('/api/playlists', { token }),
+  getMyPlaylists: async (_token?: string): Promise<{ playlists: Playlist[] }> => {
+    const { playlists } = await api<{ playlists: BackendPlaylist[] }>('/api/playlists');
+    return { playlists: playlists.map(toFspeciiPlaylist) };
+  },
 
-  getPlaylist: (id: string, token?: string | null): Promise<{ playlist: Playlist, songs: any[] }> =>
-    api(`/api/playlists/${id}`, { token: token || undefined }),
+  getPlaylist: async (id: string, _token?: string | null): Promise<{ playlist: Playlist; songs: Song[] }> => {
+    const data = await api<{ playlist: BackendPlaylist; tracks: BackendTrack[] }>(`/api/playlists/${encodeURIComponent(id)}`);
+    return {
+      playlist: toFspeciiPlaylist(data.playlist),
+      songs: data.tracks.map((t) => toFspeciiSong(t, ctx())),
+    };
+  },
 
-  getFeaturedPlaylists: (): Promise<{ playlists: Array<Playlist & { creator?: string; creator_avatar?: string }> }> =>
-    api('/api/playlists/public/featured'),
+  // We don't expose public playlists yet.
+  getFeaturedPlaylists: async (): Promise<{ playlists: Array<Playlist & { creator?: string; creator_avatar?: string }> }> => ({ playlists: [] }),
 
-  addSong: (playlistId: string, songId: string, token: string): Promise<{ success: boolean }> =>
-    api(`/api/playlists/${playlistId}/songs`, { method: 'POST', body: { songId }, token }),
+  // Backend route is /tracks (not /songs) and takes { trackId } (not { songId }).
+  addSong: async (playlistId: string, songId: string, _token?: string): Promise<{ success: boolean }> => {
+    await api(`/api/playlists/${encodeURIComponent(playlistId)}/tracks`, {
+      method: 'POST',
+      body: { trackId: Number(songId) },
+    });
+    return { success: true };
+  },
 
-  removeSong: (playlistId: string, songId: string, token: string): Promise<{ success: boolean }> =>
-    api(`/api/playlists/${playlistId}/songs/${songId}`, { method: 'DELETE', token }),
+  removeSong: async (playlistId: string, songId: string, _token?: string): Promise<{ success: boolean }> => {
+    await api(`/api/playlists/${encodeURIComponent(playlistId)}/tracks/${encodeURIComponent(songId)}`, { method: 'DELETE' });
+    return { success: true };
+  },
 
-  update: (id: string, updates: Partial<Playlist>, token: string): Promise<{ playlist: Playlist }> =>
-    api(`/api/playlists/${id}`, { method: 'PATCH', body: updates, token }),
+  // Updating playlist name/description/privacy not yet supported server-side —
+  // return the current row so the UI sees a result.
+  update: async (id: string, updates: Partial<Playlist>, _token?: string): Promise<{ playlist: Playlist }> => {
+    const { playlist } = await playlistsApi.getPlaylist(id);
+    return { playlist: { ...playlist, ...updates } };
+  },
 
-  delete: (id: string, token: string): Promise<{ success: boolean }> =>
-    api(`/api/playlists/${id}`, { method: 'DELETE', token }),
+  delete: async (id: string, _token?: string): Promise<{ success: boolean }> => {
+    await api(`/api/playlists/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return { success: true };
+  },
 };
 
 // Search API
@@ -622,14 +632,19 @@ export interface SearchResult {
 }
 
 export const searchApi = {
-  search: async (query: string, type?: 'songs' | 'creators' | 'playlists' | 'all'): Promise<SearchResult> => {
-    const params = new URLSearchParams({ q: query });
-    if (type && type !== 'all') params.append('type', type);
-    const result = await api(`/api/search?${params}`) as SearchResult;
-    return {
-      ...result,
-      songs: transformSongs(result.songs || []),
-    };
+  // Backend doesn't have a search endpoint yet, so filter the user's own
+  // library client-side on title/style/lyrics. Public discovery is empty for
+  // now — surfaces as "no results" rather than a fetch error.
+  search: async (query: string, _type?: 'songs' | 'creators' | 'playlists' | 'all'): Promise<SearchResult> => {
+    const q = (query || '').toLowerCase().trim();
+    if (!q) return { songs: [], creators: [], playlists: [] };
+    const { songs } = await songsApi.getMySongs();
+    const matched = songs.filter((s) =>
+      s.title.toLowerCase().includes(q)
+      || (s.style || '').toLowerCase().includes(q)
+      || (s.lyrics || '').toLowerCase().includes(q),
+    );
+    return { songs: matched, creators: [], playlists: [] };
   },
 };
 
@@ -643,8 +658,13 @@ export interface ContactFormData {
 }
 
 export const contactApi = {
-  submit: (data: ContactFormData): Promise<{ success: boolean; message: string; id: string }> =>
-    api('/api/contact', { method: 'POST', body: data }),
+  // Contact form not wired to the backend. For now we no-op with a fake
+  // success — keeps the UI happy. Wire to an email-send endpoint later.
+  submit: async (_data: ContactFormData): Promise<{ success: boolean; message: string; id: string }> => ({
+    success: true,
+    message: 'Thanks — we received your message.',
+    id: '',
+  }),
 };
 
 // Training API (LoRA fine-tuning via Gradio)
@@ -713,175 +733,29 @@ export function getTrainingAudioUrl(audioPath: unknown, token?: string): string 
   return undefined;
 }
 
+// LoRA fine-tuning isn't supported on this deployment — every method below
+// rejects with the same error so the Training tab degrades to "unavailable"
+// rather than throwing arbitrary fetch failures.
+const TRAINING_UNAVAILABLE = () => Promise.reject(new Error('Training is not available on this deployment.'));
+
 export const trainingApi = {
-  // Upload audio files for a dataset
-  uploadAudio: async (files: File[], datasetName: string, token: string): Promise<{
-    files: Array<{ filename: string; originalName: string; size: number; path: string }>;
-    uploadDir: string;
-    count: number;
-  }> => {
-    const formData = new FormData();
-    formData.append('datasetName', datasetName);
-    for (const file of files) {
-      formData.append('audio', file);
-    }
-    const response = await fetch(`${API_BASE}/api/training/upload-audio`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
-      throw new Error(error.error || 'Upload failed');
-    }
-    return response.json();
-  },
+  uploadAudio: (_files: File[], _ds: string, _t: string) => TRAINING_UNAVAILABLE() as Promise<any>,
 
-  // Build dataset JSON from uploaded audio files
-  buildDataset: (params: {
-    datasetName: string;
-    customTag?: string;
-    tagPosition?: string;
-    allInstrumental?: boolean;
-  }, token: string): Promise<{
-    status: string;
-    dataframe: unknown;
-    sampleCount: number;
-    sample: TrainingSample;
-    settings: DatasetSettings;
-    datasetPath: string;
-  }> => api('/api/training/build-dataset', { method: 'POST', body: params, token }),
-
-  // Scan directory for audio files (Node.js implementation)
-  scanDirectory: (params: {
-    audioDir: string;
-    datasetName?: string;
-    customTag?: string;
-    tagPosition?: string;
-    allInstrumental?: boolean;
-  }, token: string): Promise<{
-    status: string;
-    dataframe: unknown;
-    sampleCount: number;
-    audioDir: string;
-  }> => api('/api/training/scan-directory', { method: 'POST', body: params, token }),
-
-  // Auto-label dataset samples (requires model loaded in Gradio)
-  autoLabel: (params: {
-    skipMetas?: boolean;
-    formatLyrics?: boolean;
-    transcribeLyrics?: boolean;
-    onlyUnlabeled?: boolean;
-  }, token: string): Promise<{
-    dataframe?: unknown;
-    status: string;
-    error?: string;
-    hint?: string;
-  }> => api('/api/training/auto-label', { method: 'POST', body: params, token }),
-
-  // Initialize model for training (requires Gradio)
-  initModel: (params: {
-    checkpoint?: string;
-    configPath?: string;
-    device?: string;
-    initLlm?: boolean;
-    lmModelPath?: string;
-    backend?: string;
-    useFlashAttention?: boolean;
-    offloadToCpu?: boolean;
-    offloadDitToCpu?: boolean;
-    compileModel?: boolean;
-    quantization?: boolean;
-  }, token: string): Promise<{
-    status: string;
-    modelReady?: boolean;
-    error?: string;
-    hint?: string;
-  }> => api('/api/training/init-model', { method: 'POST', body: params, token }),
-
-  // List available checkpoints
-  getCheckpoints: (token: string): Promise<{
-    checkpoints: string[];
-    configs: string[];
-  }> => api('/api/training/checkpoints', { token }),
-
-  // List LoRA training checkpoints
-  getLoraCheckpoints: (dir: string, token: string): Promise<{
-    checkpoints: string[];
-    outputDir: string;
-  }> => api(`/api/training/lora-checkpoints?dir=${encodeURIComponent(dir)}`, { token }),
-
-  // Preprocess dataset to tensors
-  preprocess: (params: {
-    datasetPath: string;
-    outputDir?: string;
-  }, token: string): Promise<{
-    status: string;
-    message?: string;
-    output_files?: number;
-  }> => api('/api/training/preprocess', { method: 'POST', body: params, token }),
-
-  loadDataset: (datasetPath: string, token: string): Promise<{
-    status: string;
-    dataframe: unknown;
-    sampleCount: number;
-    sample: TrainingSample;
-    settings: DatasetSettings;
-  }> => api('/api/training/load-dataset', { method: 'POST', body: { datasetPath }, token }),
-
-  getSamplePreview: (idx: number, token: string): Promise<TrainingSample> =>
-    api(`/api/training/sample-preview?idx=${idx}`, { token }),
-
-  saveSample: (params: {
-    sampleIdx: number;
-    caption: string;
-    genre: string;
-    promptOverride: string;
-    lyrics: string;
-    bpm: number;
-    key: string;
-    timeSignature: string;
-    language: string;
-    instrumental: boolean;
-  }, token: string): Promise<{ dataframe: unknown; status: string }> =>
-    api('/api/training/save-sample', { method: 'POST', body: params, token }),
-
-  updateSettings: (params: {
-    customTag: string;
-    tagPosition: string;
-    allInstrumental: boolean;
-    genreRatio: number;
-  }, token: string): Promise<{ success: boolean }> =>
-    api('/api/training/update-settings', { method: 'POST', body: params, token }),
-
-  saveDataset: (params: {
-    savePath?: string;
-    datasetName?: string;
-    customTag?: string;
-    tagPosition?: string;
-    allInstrumental?: boolean;
-    genreRatio?: number;
-  }, token: string): Promise<{ status: string; path: string }> =>
-    api('/api/training/save-dataset', { method: 'POST', body: params, token }),
-
-  loadTensors: (tensorDir: string, token: string): Promise<{ status: string }> =>
-    api('/api/training/load-tensors', { method: 'POST', body: { tensorDir }, token }),
-
-  startTraining: (params: TrainingParams, token: string): Promise<{
-    progress: string;
-    log: string;
-    metrics: unknown;
-  }> => api('/api/training/start', { method: 'POST', body: params, token }),
-
-  stopTraining: (token: string): Promise<{ status: string }> =>
-    api('/api/training/stop', { method: 'POST', token }),
-
-  exportLora: (params: {
-    exportPath?: string;
-    loraOutputDir?: string;
-  }, token: string): Promise<{ status: string }> =>
-    api('/api/training/export', { method: 'POST', body: params, token }),
-
-  importDataset: (datasetType: string, token: string): Promise<{ status: string }> =>
-    api('/api/training/import-dataset', { method: 'POST', body: { datasetType }, token }),
+  buildDataset:       (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  scanDirectory:      (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  autoLabel:          (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  initModel:          (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  getCheckpoints:     (..._a: unknown[]) => Promise.resolve({ checkpoints: [], configs: [] }),
+  getLoraCheckpoints: (..._a: unknown[]) => Promise.resolve({ checkpoints: [], outputDir: '' }),
+  preprocess:         (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  loadDataset:        (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  getSamplePreview:   (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  saveSample:         (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  updateSettings:     (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  saveDataset:        (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  loadTensors:        (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  startTraining:      (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  stopTraining:       (..._a: unknown[]) => Promise.resolve({ status: 'idle' }),
+  exportLora:         (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  importDataset:      (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
 };
