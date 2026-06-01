@@ -155,118 +155,120 @@ export interface Song {
   generation_params?: any;
 }
 
-// Transform songs to have proper audio URLs
-function transformSongs(songs: Song[]): Song[] {
-  return songs.map(song => {
-    const rawUrl = song.audio_url || song.audioUrl;
-    const resolvedUrl = getAudioUrl(rawUrl, song.id);
-    return {
-      ...song,
-      audio_url: resolvedUrl,
-      audioUrl: resolvedUrl,
-    };
-  });
+// Our backend's track shape, as returned by /api/jobs (and /api/jobs/:id).
+// See server/lib/tracks.js → publicTrack(). audioUrl/coverUrl are relative
+// paths like "/api/audio/42" which need API_BASE prepended for the browser.
+interface BackendTrack {
+  id: number;
+  title: string | null;
+  status: 'queued' | 'running' | 'done' | 'error';
+  params: {
+    style?: string;
+    lyrics?: string;
+    theme?: string;
+    duration?: number;
+    bpm?: number;
+    key?: string;
+    language?: string;
+    timesignature?: string;
+    quality?: string;
+    voiceModel?: string | null;
+    writeLyrics?: boolean;
+    [k: string]: unknown;
+  };
+  createdAt: string;
+  queuePosition: number | null;
+  progress: { percent?: number } | null;
+  audioUrl: string | null;
+  coverUrl: string | null;
+  coverPending: boolean;
 }
 
+// Map our /api/jobs track row to fspecii's Song shape. fspecii's UI reads
+// BOTH camelCase and snake_case keys for some fields (audio_url AND audioUrl,
+// like_count AND likeCount, etc.) — we populate both for safety.
+function toFspeciiSong(t: BackendTrack, currentUser?: User | null): Song {
+  const id = String(t.id);
+  const audioRel = t.audioUrl;
+  const coverRel = t.coverUrl;
+  return {
+    id,
+    title: t.title || `Track #${t.id}`,
+    lyrics: String(t.params.lyrics || ''),
+    style: String(t.params.style || ''),
+    caption: undefined,
+    cover_url: coverRel ? `${API_BASE}${coverRel}` : undefined,
+    audio_url: audioRel ? `${API_BASE}${audioRel}` : undefined,
+    audioUrl:  audioRel ? `${API_BASE}${audioRel}` : undefined,
+    duration: typeof t.params.duration === 'number' ? t.params.duration : undefined,
+    bpm: typeof t.params.bpm === 'number' ? t.params.bpm : undefined,
+    key_scale: typeof t.params.key === 'string' ? t.params.key : undefined,
+    time_signature: typeof t.params.timesignature === 'string' ? t.params.timesignature : undefined,
+    tags: [], // we don't store tag arrays — style string carries everything
+    is_public: false, // we don't expose public sharing yet
+    like_count: 0,
+    view_count: 0,
+    user_id: currentUser?.id,
+    creator: currentUser?.username,
+    creator_avatar: undefined,
+    created_at: t.createdAt,
+    generation_params: t.params,
+  };
+}
+
+let _currentUserCache: User | null = null;
+export function _setCurrentUserForSongMapper(u: User | null) { _currentUserCache = u; }
+function ctx() { return _currentUserCache; }
+
 export const songsApi = {
-  getMySongs: async (token: string): Promise<{ songs: Song[] }> => {
-    const result = await api('/api/songs', { token }) as { songs: Song[] };
-    return { songs: transformSongs(result.songs) };
+  // Library list — backed by /api/jobs.
+  getMySongs: async (_token?: string): Promise<{ songs: Song[] }> => {
+    const { tracks } = await api<{ tracks: BackendTrack[] }>('/api/jobs');
+    return { songs: tracks.map((t) => toFspeciiSong(t, ctx())) };
   },
 
-  getPublicSongs: async (limit = 20, offset = 0): Promise<{ songs: Song[] }> => {
-    const result = await api(`/api/songs/public?limit=${limit}&offset=${offset}`) as { songs: Song[] };
-    return { songs: transformSongs(result.songs) };
+  // Public/featured feeds aren't supported on our backend yet — return [] so
+  // the UI shows empty states instead of crashing on 404s.
+  getPublicSongs:   async (_l?: number, _o?: number): Promise<{ songs: Song[] }> => ({ songs: [] }),
+  getFeaturedSongs: async (): Promise<{ songs: Song[] }> => ({ songs: [] }),
+  getLikedSongs:    async (_token?: string): Promise<{ songs: Song[] }> => ({ songs: [] }),
+
+  getSong: async (id: string, _token?: string | null): Promise<{ song: Song }> => {
+    const t = await api<BackendTrack>(`/api/jobs/${encodeURIComponent(id)}`);
+    return { song: toFspeciiSong(t, ctx()) };
   },
 
-  getFeaturedSongs: async (): Promise<{ songs: Song[] }> => {
-    const result = await api('/api/songs/public/featured') as { songs: Song[] };
-    return { songs: transformSongs(result.songs) };
+  getFullSong: async (id: string, _token?: string | null): Promise<{ song: Song; comments: Comment[] }> => {
+    const { song } = await songsApi.getSong(id);
+    // Comments not supported — empty array keeps the UI happy.
+    return { song, comments: [] };
   },
 
-  getSong: async (id: string, token?: string | null): Promise<{ song: Song }> => {
-    const result = await api(`/api/songs/${id}`, { token: token || undefined }) as { song: Song };
-    const rawUrl = result.song.audio_url || result.song.audioUrl;
-    const resolvedUrl = getAudioUrl(rawUrl, result.song.id);
-    return { song: { ...result.song, audio_url: resolvedUrl, audioUrl: resolvedUrl } };
+  // Track rows are created server-side by /api/generate. We don't have a
+  // direct "createSong" path — this is a no-op compatibility stub.
+  createSong: async (_song: Partial<Song>, _token: string): Promise<{ song: Song }> => {
+    throw new Error('createSong unsupported — use generateApi.create() instead.');
   },
 
-  getFullSong: async (id: string, token?: string | null): Promise<{ song: Song, comments: any[] }> => {
-    const result = await api(`/api/songs/${id}/full`, { token: token || undefined }) as { song: Song, comments: any[] };
-    const rawUrl = result.song.audio_url || result.song.audioUrl;
-    const resolvedUrl = getAudioUrl(rawUrl, result.song.id);
-    return { ...result, song: { ...result.song, audio_url: resolvedUrl, audioUrl: resolvedUrl } };
+  // We don't support editing title/style after creation yet. Return whatever's
+  // currently stored so the UI sees a result instead of an error.
+  updateSong: async (id: string, _updates: Partial<Song>, _token: string): Promise<{ song: any }> => {
+    const { song } = await songsApi.getSong(id);
+    return { song };
   },
 
-  createSong: (song: Partial<Song>, token: string): Promise<{ song: Song }> =>
-    api('/api/songs', { method: 'POST', body: song, token }),
+  deleteSong: (id: string, _token?: string): Promise<{ success: boolean }> =>
+    api(`/api/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-  updateSong: async (id: string, updates: Partial<Song>, token: string): Promise<{ song: any }> => {
-    const result = await api(`/api/songs/${id}`, { method: 'PATCH', body: updates, token }) as { song: any };
-    const s = result.song;
-    const rawUrl = s.audio_url || s.audioUrl;
-    const resolvedUrl = getAudioUrl(rawUrl, s.id);
+  // Likes / privacy / play-count not modelled server-side; treat as no-ops.
+  toggleLike:    async (_id: string, _token?: string): Promise<{ liked: boolean }>   => ({ liked: false }),
+  togglePrivacy: async (_id: string, _token?: string): Promise<{ isPublic: boolean }> => ({ isPublic: false }),
+  trackPlay:     async (_id: string, _token?: string | null): Promise<{ viewCount: number }> => ({ viewCount: 0 }),
 
-    return {
-      song: {
-        id: s.id,
-        title: s.title,
-        lyrics: s.lyrics,
-        style: s.style,
-        caption: s.caption,
-        cover_url: s.cover_url,
-        coverUrl: s.cover_url || s.coverUrl || `https://picsum.photos/seed/${s.id}/400/400`,
-        duration: s.duration && s.duration > 0 ? `${Math.floor(s.duration / 60)}:${String(Math.floor(s.duration % 60)).padStart(2, '0')}` : '0:00',
-        createdAt: new Date(s.created_at || s.createdAt),
-        created_at: s.created_at,
-        tags: s.tags || [],
-        audioUrl: resolvedUrl,
-        audio_url: resolvedUrl,
-        isPublic: s.is_public ?? s.isPublic,
-        is_public: s.is_public ?? s.isPublic,
-        likeCount: s.like_count || s.likeCount || 0,
-        like_count: s.like_count || s.likeCount || 0,
-        viewCount: s.view_count || s.viewCount || 0,
-        view_count: s.view_count || s.viewCount || 0,
-        userId: s.user_id || s.userId,
-        user_id: s.user_id || s.userId,
-        creator: s.creator,
-        creator_avatar: s.creator_avatar,
-        ditModel: s.dit_model || s.ditModel,
-        isGenerating: s.isGenerating,
-        queuePosition: s.queuePosition,
-        bpm: s.bpm,
-        key_scale: s.key_scale,
-        time_signature: s.time_signature,
-      }
-    };
-  },
-
-  deleteSong: (id: string, token: string): Promise<{ success: boolean }> =>
-    api(`/api/songs/${id}`, { method: 'DELETE', token }),
-
-  toggleLike: (id: string, token: string): Promise<{ liked: boolean }> =>
-    api(`/api/songs/${id}/like`, { method: 'POST', token }),
-
-  getLikedSongs: async (token: string): Promise<{ songs: Song[] }> => {
-    const result = await api('/api/songs/liked/list', { token }) as { songs: Song[] };
-    return { songs: transformSongs(result.songs) };
-  },
-
-  togglePrivacy: (id: string, token: string): Promise<{ isPublic: boolean }> =>
-    api(`/api/songs/${id}/privacy`, { method: 'PATCH', token }),
-
-  trackPlay: (id: string, token?: string | null): Promise<{ viewCount: number }> =>
-    api(`/api/songs/${id}/play`, { method: 'POST', token: token || undefined }),
-
-  getComments: (id: string, token?: string | null): Promise<{ comments: Comment[] }> =>
-    api(`/api/songs/${id}/comments`, { token: token || undefined }),
-
-  addComment: (id: string, content: string, token: string): Promise<{ comment: Comment }> =>
-    api(`/api/songs/${id}/comments`, { method: 'POST', body: { content }, token }),
-
-  deleteComment: (commentId: string, token: string): Promise<{ success: boolean }> =>
-    api(`/api/songs/comments/${commentId}`, { method: 'DELETE', token }),
+  // Comments not yet implemented — return empty / reject.
+  getComments:   async (_id: string, _token?: string | null): Promise<{ comments: Comment[] }> => ({ comments: [] }),
+  addComment:    async (_id: string, _c: string, _token?: string): Promise<{ comment: Comment }> => { throw new Error('Comments are not available yet.'); },
+  deleteComment: async (_id: string, _token?: string): Promise<{ success: boolean }> => ({ success: true }),
 };
 
 interface Comment {

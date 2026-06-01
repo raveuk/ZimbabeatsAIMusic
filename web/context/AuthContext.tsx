@@ -8,7 +8,7 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
-import { authApi, User } from '../services/api';
+import { authApi, User, _setCurrentUserForSongMapper } from '../services/api';
 import { auth as firebaseAuth } from '../services/firebase';
 
 // AuthContext that surfaces Firebase sign-in to fspecii's existing UI.
@@ -55,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
       if (!fbUser) {
         setUser(null);
         setToken(null);
+        _setCurrentUserForSongMapper(null);
         setIsLoading(false);
         return;
       }
@@ -63,10 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
         setToken(idToken);
         const { user: backendUser } = await authApi.me();
         setUser(backendUser);
+        _setCurrentUserForSongMapper(backendUser);
       } catch (err) {
         console.error('Auth bootstrap failed:', err);
         setUser(null);
         setToken(null);
+        _setCurrentUserForSongMapper(null);
       } finally {
         setIsLoading(false);
       }
