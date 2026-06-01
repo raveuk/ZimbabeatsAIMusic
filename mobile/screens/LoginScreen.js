@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, ScrollView } from "react-native";
 import { api, setToken } from "../lib/api";
+import { colors, space, radius, typography } from "../lib/theme";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
 
 const isWeb = Platform.OS === "web";
 
 export default function LoginScreen({ onAuthed }) {
-  const [mode, setMode] = useState("login"); // or "register"
+  const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -14,10 +17,7 @@ export default function LoginScreen({ onAuthed }) {
     if (!email) return Alert.alert("Enter your email", "Type your email above first, then tap Forgot password.");
     try {
       await api.forgot(email);
-      Alert.alert(
-        "Check your email",
-        "If that address has an account, we've sent a reset link. Open it on this Wi-Fi to set a new password."
-      );
+      Alert.alert("Check your email", "If that address has an account, we've sent a reset link.");
     } catch (e) {
       Alert.alert("Couldn't send", e.message);
     }
@@ -30,11 +30,8 @@ export default function LoginScreen({ onAuthed }) {
       await setToken(res.token);
       onAuthed(res.user);
     } catch (e) {
-      // popup-closed / popup-blocked / unauthorized-domain — show the message.
       Alert.alert("Google sign-in failed", e.message);
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   }
 
   async function submit() {
@@ -43,83 +40,118 @@ export default function LoginScreen({ onAuthed }) {
     try {
       const res = mode === "login" ? await api.login(email, password) : await api.register(email, password);
       await setToken(res.token);
-      onAuthed(res.user); // passes { id, email, role } back to App.js
+      onAuthed(res.user);
     } catch (e) {
-      Alert.alert(mode === "login" ? "Login failed" : "Register failed", e.message);
-    } finally {
-      setBusy(false);
-    }
+      Alert.alert(mode === "login" ? "Login failed" : "Couldn't sign up", e.message);
+    } finally { setBusy(false); }
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.logo}>🎵 AI Music</Text>
-      <Text style={styles.subtitle}>{mode === "login" ? "Welcome back" : "Create an account"}</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-        placeholderTextColor="#888"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        placeholderTextColor="#888"
-      />
-      <TouchableOpacity style={styles.button} onPress={submit} disabled={busy}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{mode === "login" ? "Log in" : "Sign up"}</Text>}
-      </TouchableOpacity>
+    <ScrollView contentContainerStyle={styles.outer}>
+      <View style={styles.card}>
+        <View style={styles.logoWrap}>
+          <View style={styles.logoOrb} />
+          <Text style={styles.brand}>Zimbabeats AI</Text>
+          <Text style={styles.tagline}>
+            {mode === "login" ? "Welcome back. Sign in to keep creating." : "Create your account — make music in seconds."}
+          </Text>
+        </View>
 
-      {isWeb && (
-        <>
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-          <TouchableOpacity style={styles.googleBtn} onPress={google} disabled={busy}>
-            <Text style={styles.googleText}>Continue with Google</Text>
+        <Input
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@example.com"
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        <Input
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          placeholder="••••••••"
+          secureTextEntry
+        />
+
+        <Button
+          label={mode === "login" ? "Log in" : "Sign up"}
+          onPress={submit}
+          busy={busy}
+          style={{ marginTop: space.sm }}
+        />
+
+        {isWeb && (
+          <>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+            <Button
+              label="Continue with Google"
+              onPress={google}
+              busy={busy}
+              variant="secondary"
+            />
+          </>
+        )}
+
+        {mode === "login" && (
+          <TouchableOpacity onPress={forgot} style={styles.forgotBtn}>
+            <Text style={styles.forgot}>Forgot password?</Text>
           </TouchableOpacity>
-        </>
-      )}
+        )}
 
-      <TouchableOpacity onPress={() => setMode(mode === "login" ? "register" : "login")}>
-        <Text style={styles.switch}>
-          {mode === "login" ? "Need an account? Sign up" : "Have an account? Log in"}
-        </Text>
-      </TouchableOpacity>
-      {mode === "login" && (
-        <TouchableOpacity onPress={forgot}>
-          <Text style={styles.forgot}>Forgot password?</Text>
-        </TouchableOpacity>
-      )}
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLead}>
+            {mode === "login" ? "New here?" : "Already have an account?"}
+          </Text>
+          <TouchableOpacity onPress={() => setMode(mode === "login" ? "register" : "login")}>
+            <Text style={styles.switchLink}>{mode === "login" ? "Sign up" : "Log in"}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
-      <Text style={styles.credit}>Created by Rahim Manji</Text>
-      <Text style={styles.copyright}>© 2026 — All rights reserved</Text>
-    </View>
+      <Text style={styles.credit}>Created by Rahim Manji  ·  © 2026</Text>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 28, backgroundColor: "#0f0f14" },
-  logo: { fontSize: 40, textAlign: "center", color: "#fff" },
-  subtitle: { fontSize: 16, textAlign: "center", color: "#aaa", marginBottom: 28, marginTop: 8 },
-  input: { backgroundColor: "#1c1c26", color: "#fff", borderRadius: 12, padding: 16, marginBottom: 12, fontSize: 16 },
-  button: { backgroundColor: "#6d5cff", borderRadius: 12, padding: 16, alignItems: "center", marginTop: 8 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  switch: { color: "#8a7cff", textAlign: "center", marginTop: 20 },
-  forgot: { color: "#888", textAlign: "center", marginTop: 14, fontSize: 13 },
-  dividerRow: { flexDirection: "row", alignItems: "center", marginTop: 18, marginBottom: 4 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "#2a2a38" },
-  dividerText: { color: "#666", marginHorizontal: 10, fontSize: 12 },
-  googleBtn: { backgroundColor: "#fff", borderRadius: 12, padding: 14, alignItems: "center", marginTop: 8 },
-  googleText: { color: "#1f1f24", fontSize: 15, fontWeight: "600" },
-  credit: { color: "#555", textAlign: "center", marginTop: 36, fontSize: 12, fontWeight: "600", letterSpacing: 0.5 },
-  copyright: { color: "#444", textAlign: "center", marginTop: 4, fontSize: 11 },
+  outer: {
+    flexGrow: 1,
+    backgroundColor: colors.bg,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.xxl,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  card: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: space.xl,
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  logoWrap: { alignItems: "center", marginBottom: space.xl },
+  logoOrb: {
+    width: 56, height: 56, borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    marginBottom: space.md,
+    // simple radial glow effect on web
+    boxShadow: "0 0 24px rgba(255, 106, 61, 0.5)",
+  },
+  brand: { ...typography.h2, color: colors.text, textAlign: "center" },
+  tagline: { ...typography.meta, color: colors.textMute, textAlign: "center", marginTop: space.xs },
+  dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: space.lg },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.divider },
+  dividerText: { ...typography.caption, color: colors.textFade, marginHorizontal: space.md, textTransform: "uppercase", letterSpacing: 1 },
+  forgotBtn: { alignSelf: "center", paddingVertical: space.md },
+  forgot: { ...typography.meta, color: colors.textMute },
+  switchRow: { flexDirection: "row", justifyContent: "center", marginTop: space.lg, gap: space.xs },
+  switchLead: { ...typography.meta, color: colors.textFade },
+  switchLink: { ...typography.meta, color: colors.accent, fontWeight: "700" },
+  credit: { ...typography.caption, color: colors.textFade, marginTop: space.xl, textAlign: "center" },
 });

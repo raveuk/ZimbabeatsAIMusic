@@ -103,24 +103,24 @@ function Tab({ label, active, onPress }) {
 
 const isWeb = Platform.OS === "web";
 const styles = StyleSheet.create({
-  // Desktop frame: dark page background, app centred and capped.
+  // Desktop frame: pure black gutter, app centred and capped.
   outer: {
     flex: 1,
-    backgroundColor: isWeb ? "#000" : "#0f0f14",
+    backgroundColor: isWeb ? "#000" : "#0a0a0f",
     alignItems: isWeb ? "center" : "stretch",
   },
   shell: {
     flex: 1,
     width: "100%",
     maxWidth: isWeb ? 480 : undefined,
-    backgroundColor: "#0f0f14",
+    backgroundColor: "#0a0a0f",
   },
-  fill: { flex: 1, backgroundColor: "#0f0f14" },
-  topbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 12 },
-  brand: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  logout: { color: "#8a7cff", fontSize: 14 },
-  tabbar: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#222", backgroundColor: "#13131a" },
-  tab: { flex: 1, paddingVertical: 16, alignItems: "center" },
-  tabText: { color: "#777", fontSize: 15, fontWeight: "600" },
-  tabActive: { color: "#8a7cff" },
+  fill: { flex: 1, backgroundColor: "#0a0a0f" },
+  topbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14 },
+  brand: { color: "#fafaff", fontSize: 18, fontWeight: "800", letterSpacing: -0.2 },
+  logout: { color: "#a5a5b8", fontSize: 13 },
+  tabbar: { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#262631", backgroundColor: "#0a0a0f" },
+  tab: { flex: 1, paddingVertical: 14, alignItems: "center" },
+  tabText: { color: "#6b6b80", fontSize: 13, fontWeight: "600", letterSpacing: 0.3 },
+  tabActive: { color: "#ff6a3d" },
 });
