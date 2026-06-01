@@ -16,8 +16,12 @@ import path from "node:path";
 
 const ROOT  = path.dirname(new URL(import.meta.url).pathname);
 const FILE  = path.join(ROOT, "..", "web", "i18n", "translations.ts");
-const MODEL = process.env.OLLAMA_MODEL || "gemma4:31b-fast";
+// translategemma is a Gemma-based model explicitly fine-tuned for translation
+// quality across ~30 languages. Much better than a general-purpose chat model.
+const MODEL = process.env.OLLAMA_MODEL || "translategemma:27b-it-q4_K_M";
 const URL_  = process.env.OLLAMA_URL   || "http://127.0.0.1:11434";
+// Generation can take a while for a 27B model — give each call up to 5 min.
+const FETCH_TIMEOUT_MS = 5 * 60 * 1000;
 
 // Languages to add — code + human-readable name + tag for Ollama.
 const TARGETS = [
@@ -52,13 +56,23 @@ console.log(`Found ${keys.length} keys.`);
 // 2. Ollama batch translator.
 // ---------------------------------------------------------------------------
 async function askOllama(prompt) {
-  const res = await fetch(`${URL_}/api/generate`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model: MODEL, prompt, stream: false, options: { temperature: 0.2 } }),
-  });
-  const data = await res.json();
-  return data.response || "";
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${URL_}/api/generate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: MODEL, prompt, stream: false, options: { temperature: 0.2, num_predict: 4096 } }),
+      signal: ac.signal,
+    });
+    const data = await res.json();
+    return data.response || "";
+  } catch (e) {
+    console.warn("    ollama call failed:", e?.message || e);
+    return "";
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function buildPrompt(targetName, slice) {

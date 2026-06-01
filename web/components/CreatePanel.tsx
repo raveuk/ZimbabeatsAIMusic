@@ -1110,9 +1110,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
         {/* Header - Mode Toggle & Model Selection */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          {/* Status pip — green dot indicates the generation backend is online.
+              The engine version label used to live here but it leaked the
+              underlying model name; we just keep the visual signal now. */}
+          <div className="flex items-center gap-2" title="Online">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">ACE-Step v1.5</span>
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Online</span>
           </div>
 
           <div className="flex items-center gap-2">
