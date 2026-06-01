@@ -78,6 +78,13 @@ function AppContent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showRightSidebar, setShowRightSidebar] = useState(true);
   const [showLeftSidebar, setShowLeftSidebar] = useState(true);
+  // CreatePanel width is user-resizable on desktop via the vertical divider.
+  // Clamped to [240, 560] px and persisted across sessions.
+  const [createPanelWidth, setCreatePanelWidth] = useState<number>(() => {
+    const stored = parseInt(localStorage.getItem('createPanelWidth') || '', 10);
+    return Number.isFinite(stored) && stored >= 240 && stored <= 560 ? stored : 360;
+  });
+  const createPanelResizeRef = useRef<{ startX: number; startW: number } | null>(null);
   const [pendingAudioSelection, setPendingAudioSelection] = useState<{ target: 'reference' | 'source'; url: string; title?: string } | null>(null);
 
   // Mobile UI Toggle
@@ -382,6 +389,40 @@ function AppContent() {
       loadReferenceTracks();
     }
   }, [currentView, loadReferenceTracks]);
+
+  // CreatePanel resize: mousedown on the divider seeds startX/startW, mousemove
+  // recalculates width (clamped), mouseup commits to localStorage. Cursor +
+  // user-select are forced globally during the drag so the page text doesn't
+  // get accidentally selected.
+  const onCreatePanelDragStart = useCallback((e: React.MouseEvent) => {
+    createPanelResizeRef.current = { startX: e.clientX, startW: createPanelWidth };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = (ev: MouseEvent) => {
+      const r = createPanelResizeRef.current;
+      if (!r) return;
+      const next = Math.max(240, Math.min(560, r.startW + (ev.clientX - r.startX)));
+      setCreatePanelWidth(next);
+    };
+    const onUp = () => {
+      const r = createPanelResizeRef.current;
+      createPanelResizeRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      if (r) {
+        try { localStorage.setItem('createPanelWidth', String(Math.round(parseFloat(String(document.documentElement.style.getPropertyValue('--cp-w')) || '0') || 0))); } catch {}
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [createPanelWidth]);
+
+  // Persist width on every change (simpler + survives sudden tab close).
+  useEffect(() => {
+    try { localStorage.setItem('createPanelWidth', String(createPanelWidth)); } catch {}
+  }, [createPanelWidth]);
 
   // Player Logic
   const getActiveQueue = (song?: Song) => {
@@ -1304,10 +1345,13 @@ function AppContent() {
         return (
           <div className="flex h-full overflow-hidden relative w-full">
             {/* Create Panel */}
-            <div className={`
-              ${mobileShowList ? 'hidden md:block' : 'w-full'}
-              md:w-[320px] lg:w-[360px] flex-shrink-0 h-full border-r border-zinc-200 dark:border-white/5 bg-zinc-50 dark:bg-suno-panel relative z-10 transition-colors duration-300
-            `}>
+            <div
+              className={`
+                ${mobileShowList ? 'hidden md:block' : 'w-full'}
+                flex-shrink-0 h-full bg-zinc-50 dark:bg-suno-panel relative z-10 transition-colors duration-300
+              `}
+              style={isDesktop ? { width: createPanelWidth } : undefined}
+            >
               <CreatePanel
                 onGenerate={handleGenerate}
                 isGenerating={isGenerating}
@@ -1317,6 +1361,22 @@ function AppContent() {
                 onAudioSelectionApplied={() => setPendingAudioSelection(null)}
               />
             </div>
+
+            {/* Vertical drag handle (desktop only). Sits flush between the
+                CreatePanel and SongList; hover/active styling makes the hit
+                area easy to grab without taking visual space at rest. */}
+            {isDesktop && (
+              <div
+                onMouseDown={onCreatePanelDragStart}
+                className="hidden md:flex group items-stretch w-1.5 cursor-col-resize relative z-20 select-none"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize create panel"
+                title="Drag to resize"
+              >
+                <div className="flex-1 bg-zinc-200 dark:bg-white/5 group-hover:bg-pink-500/60 group-active:bg-pink-500/80 transition-colors" />
+              </div>
+            )}
 
             {/* Song List */}
             <div className={`
