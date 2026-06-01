@@ -260,10 +260,16 @@ function withSignedToken(url: string | undefined): string | undefined {
 }
 
 export const songsApi = {
-  // Library list — backed by /api/jobs.
+  // Library list — backed by /api/jobs. Failed rows are filtered out: they
+  // can't be played, and the UI treats them as if they were unfinished but
+  // available which is misleading.
   getMySongs: async (_token?: string): Promise<{ songs: Song[] }> => {
     const { tracks } = await api<{ tracks: BackendTrack[] }>('/api/jobs');
-    return { songs: tracks.map((t) => toFspeciiSong(t, ctx())) };
+    return {
+      songs: tracks
+        .filter((t) => t.status !== 'error')
+        .map((t) => toFspeciiSong(t, ctx())),
+    };
   },
 
   // Public/featured feeds aren't supported on our backend yet — return [] so
