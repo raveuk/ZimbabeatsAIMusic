@@ -3,7 +3,7 @@ import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash,
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { generateApi, API_BASE } from '../services/api';
+import { generateApi, lyricsApi, API_BASE } from '../services/api';
 import { MAIN_STYLES } from '../data/genres';
 import { EditableSlider } from './EditableSlider';
 
@@ -137,6 +137,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Simple Mode
   const [songDescription, setSongDescription] = useState('');
+  // Simple-mode lyric preview busy flag. The lyrics themselves live on the
+  // shared `lyrics` state so the same value is sent to the backend regardless
+  // of which mode is active.
+  const [writingSimpleLyrics, setWritingSimpleLyrics] = useState(false);
 
   // Custom Mode
   const [lyrics, setLyrics] = useState('');
@@ -672,6 +676,24 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     }
     e.target.value = '';
   };
+
+  // Simple-mode "Write lyrics from description" — calls our /api/lyrics
+  // (Ollama-backed) with the description as the theme. Result lands in the
+  // shared `lyrics` state which the Create flow then sends to ACE-Step as the
+  // exact lyric text (no server-side re-generation).
+  const writeSimpleLyrics = useCallback(async () => {
+    const theme = songDescription.trim();
+    if (!theme) return;
+    setWritingSimpleLyrics(true);
+    try {
+      const { lyrics: text } = await lyricsApi.write(theme, vocalLanguage);
+      setLyrics(text);
+    } catch (err) {
+      console.error('writeSimpleLyrics failed:', err);
+    } finally {
+      setWritingSimpleLyrics(false);
+    }
+  }, [songDescription, vocalLanguage]);
 
   // Format handler - uses LLM to enhance style/lyrics and auto-fill parameters
   const handleFormat = async (target: 'style' | 'lyrics') => {
@@ -1231,6 +1253,37 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 className="w-full h-32 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
               />
             </div>
+
+            {/* AI-generated lyrics preview — Simple mode only. The user types
+                a description above, taps "Write lyrics", and we call our
+                Ollama-backed /api/lyrics. They can edit + regenerate before
+                hitting Create N Songs. Hidden when Instrumental is on. */}
+            {!instrumental && (
+              <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+                <div className="px-3 py-2.5 flex items-center justify-between border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
+                  <span className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Lyrics
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!songDescription.trim() || writingSimpleLyrics}
+                    onClick={writeSimpleLyrics}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold text-pink-600 dark:text-pink-400 hover:bg-pink-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    title={lyrics ? 'Regenerate lyrics from the description above' : 'Generate lyrics from the description above'}
+                  >
+                    {writingSimpleLyrics
+                      ? (<><Loader2 size={12} className="animate-spin" /> Writing…</>)
+                      : (<><Sparkles size={12} /> {lyrics ? 'Regenerate' : 'Write lyrics'}</>)}
+                  </button>
+                </div>
+                <textarea
+                  value={lyrics}
+                  onChange={(e) => setLyrics(e.target.value)}
+                  placeholder="Tap “Write lyrics” to generate from the description above, or type your own. These exact lyrics get used when you Create."
+                  className="w-full h-40 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-y font-mono"
+                />
+              </div>
+            )}
 
             {/* Vocal Language (Simple) */}
             <div className="grid grid-cols-2 gap-3">

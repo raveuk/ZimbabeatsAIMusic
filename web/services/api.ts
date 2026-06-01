@@ -259,6 +259,14 @@ function withSignedToken(url: string | undefined): string | undefined {
   return `${url}${sep}token=${encodeURIComponent(_currentTokenCache)}`;
 }
 
+// Standalone lyric-writer endpoint — used by the Create panel's "Write
+// lyrics" / "Regenerate" buttons. Hits our backend's /api/lyrics route,
+// which is Ollama-backed.
+export const lyricsApi = {
+  write: async (theme: string, language?: string): Promise<{ lyrics: string }> =>
+    api<{ lyrics: string }>('/api/lyrics', { method: 'POST', body: { theme, language } }),
+};
+
 export const songsApi = {
   // Library list — backed by /api/jobs. Failed rows are filtered out: they
   // can't be played, and the UI treats them as if they were unfinished but
