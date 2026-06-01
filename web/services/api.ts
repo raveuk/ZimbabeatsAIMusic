@@ -1,17 +1,36 @@
-// Use relative URLs so Vite proxy handles them (enables LAN access)
-const API_BASE = '';
+import { auth as firebaseAuth } from './firebase';
 
-// Resolve audio URL based on storage type
+// API base — talks to our Next.js backend at api.zimbabeats.com in prod.
+// Override via VITE_API_BASE for local development (e.g. http://127.0.0.1:3000).
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) || 'https://api.zimbabeats.com';
+
+// Resolve audio/cover URL: append our Firebase ID token as ?token=… so the
+// native browser <audio>/<img> tags can fetch from our authenticated endpoint
+// without needing an Authorization header (which they can't set).
+async function withToken(url: string): Promise<string> {
+  try {
+    const t = await firebaseAuth.currentUser?.getIdToken();
+    if (!t) return url;
+    return `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(t)}`;
+  } catch { return url; }
+}
+
 export function getAudioUrl(audioUrl: string | undefined | null, songId?: string): string | undefined {
   if (!audioUrl) return undefined;
-
-  // Local storage: already relative, works with proxy
-  if (audioUrl.startsWith('/audio/')) {
-    return audioUrl;
+  // Backend serves audio at /api/audio/<id> — relative paths get prefixed with API_BASE.
+  if (audioUrl.startsWith('/')) {
+    // Token is appended lazily — components that need it should use getSignedAudioUrl.
+    return `${API_BASE}${audioUrl}`;
   }
-
-  // Already a full URL
   return audioUrl;
+}
+
+// Like getAudioUrl, but appends a fresh Firebase ID token so the <audio>/<img>
+// element can authenticate without an Authorization header.
+export async function getSignedAudioUrl(audioUrl: string | undefined | null): Promise<string | undefined> {
+  const base = getAudioUrl(audioUrl);
+  if (!base) return undefined;
+  return withToken(base);
 }
 
 interface ApiOptions {
@@ -27,21 +46,26 @@ async function api<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
     'Content-Type': 'application/json',
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  // If no explicit token was passed, pull a fresh Firebase ID token from the
+  // signed-in user. SDK auto-refreshes the token when it's near expiry, so we
+  // don't need to manage that ourselves.
+  let authToken = token;
+  if (authToken === undefined) {
+    try { authToken = (await firebaseAuth.currentUser?.getIdToken()) ?? null; } catch { authToken = null; }
   }
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
-    credentials: 'include',
+    // credentials: 'include' is for cookies — our backend uses bearer tokens
+    // and CORS would require Access-Control-Allow-Credentials. Drop it.
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
     const errorMessage = error.error || error.message || 'Request failed';
-    // Include status code in error for proper handling
     throw new Error(`${response.status}: ${errorMessage}`);
   }
 
@@ -64,25 +88,45 @@ export interface AuthResponse {
   token: string;
 }
 
+// Adapt our backend's user row to fspecii's expected User shape. Our backend
+// returns { id, email, role, disabled, track_quota, firebase_uid }; fspecii's
+// UI expects { id, username, isAdmin, ... }. Username is derived from the
+// part of the email before the '@'.
+interface BackendUser {
+  id: number;
+  email: string;
+  role: 'admin' | 'user';
+  disabled?: 0 | 1;
+  track_quota?: number | null;
+}
+function toFspeciiUser(u: BackendUser): User {
+  return {
+    id: String(u.id),
+    username: u.email.split('@')[0] || 'user',
+    isAdmin: u.role === 'admin',
+  };
+}
+
 export const authApi = {
-  // Auto-login: Get existing user from database (for local single-user app)
-  auto: (): Promise<AuthResponse> =>
-    api('/api/auth/auto'),
+  // Fetch the current user from our /api/me endpoint. The Firebase ID token is
+  // attached automatically by the api() helper. Returns null if not signed in.
+  me: async (_token?: string): Promise<{ user: User }> => {
+    const { user } = await api<{ user: BackendUser }>('/api/me');
+    return { user: toFspeciiUser(user) };
+  },
 
-  setup: (username: string): Promise<AuthResponse> =>
-    api('/api/auth/setup', { method: 'POST', body: { username } }),
-
-  me: (token: string): Promise<{ user: User }> =>
-    api('/api/auth/me', { token }),
-
-  logout: (): Promise<{ success: boolean }> =>
-    api('/api/auth/logout', { method: 'POST' }),
-
-  refresh: (token: string): Promise<AuthResponse> =>
-    api('/api/auth/refresh', { method: 'POST', token }),
-
-  updateUsername: (username: string, token: string): Promise<AuthResponse> =>
-    api('/api/auth/username', { method: 'PATCH', body: { username }, token }),
+  // Compatibility stubs — fspecii's UI calls these but on our app the entire
+  // auth lifecycle is handled by Firebase (sign-in, sign-up, sign-out). The
+  // AuthContext below short-circuits these and never calls the API path.
+  auto: async (): Promise<AuthResponse> => {
+    const { user } = await authApi.me();
+    const token = (await firebaseAuth.currentUser?.getIdToken()) || '';
+    return { user, token };
+  },
+  setup:           async (_u: string): Promise<AuthResponse> => { throw new Error('auth handled by Firebase'); },
+  logout:          async (): Promise<{ success: boolean }> => ({ success: true }),
+  refresh:         async (): Promise<AuthResponse> => authApi.auto(),
+  updateUsername:  async (_u: string, _t: string): Promise<AuthResponse> => { throw new Error('username changes via Firebase profile'); },
 };
 
 // Songs API

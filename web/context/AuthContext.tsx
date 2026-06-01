@@ -1,108 +1,123 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import {
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+} from 'firebase/auth';
 import { authApi, User } from '../services/api';
+import { auth as firebaseAuth } from '../services/firebase';
 
+// AuthContext that surfaces Firebase sign-in to fspecii's existing UI.
+// We keep the same shape they expect (user, token, isAuthenticated, logout,
+// setupUser, …) so SongList / Player / RightSidebar etc. work unchanged.
+//
+// Two flow shifts vs upstream:
+//   - There's no "auto-login as the only local user" path anymore — Firebase
+//     either has a session or it doesn't. isLoading flips false once we know.
+//   - setupUser(username) is hijacked: we no longer accept username for
+//     signup. The auth UI is replaced with an email+password modal.
+//     The compatibility stub still exists so legacy modal code that calls
+//     setupUser() doesn't crash.
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  // Compatibility surface (no-ops / map to Firebase calls)
   setupUser: (username: string) => Promise<void>;
   updateUsername: (username: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  // New Firebase-backed actions used by our SignInModal
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_KEY = 'acestep_token';
-const USER_KEY = 'acestep_user';
-
 export function AuthProvider({ children }: { children: ReactNode }): React.ReactElement {
-  // Start with null - we'll auto-login from database on mount
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
   const isAuthenticated = !!user && !!token;
 
-  // Auto-login on mount: Try to get existing user from database
+  // Single source of truth: Firebase auth state. When sign-in completes,
+  // /api/me will see the token and either return the linked SQLite row or
+  // create one on the fly (handled server-side in upsertFirebaseUser).
   useEffect(() => {
-    async function initAuth(): Promise<void> {
-      try {
-        // First, try auto-login from database (for local single-user app)
-        const { user: userData, token: newToken } = await authApi.auto();
-        setUser(userData);
-        setToken(newToken);
-        localStorage.setItem(TOKEN_KEY, newToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(userData));
-      } catch (error: unknown) {
-        // No user in database (404) or server error - that's okay
-        // Clear any stale localStorage data
-        const err = error as { message?: string };
-        if (err.message?.startsWith('404:')) {
-          // No user exists yet - frontend will show username setup
-          console.log('No user in database, need to set up username');
-        } else {
-          console.warn('Auto-login failed:', error);
-        }
-        // Clear stale data
-        setToken(null);
+    const unsub = onAuthStateChanged(firebaseAuth, async (fbUser) => {
+      if (!fbUser) {
         setUser(null);
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
+        setToken(null);
+        setIsLoading(false);
+        return;
+      }
+      try {
+        const idToken = await fbUser.getIdToken();
+        setToken(idToken);
+        const { user: backendUser } = await authApi.me();
+        setUser(backendUser);
+      } catch (err) {
+        console.error('Auth bootstrap failed:', err);
+        setUser(null);
+        setToken(null);
       } finally {
         setIsLoading(false);
       }
-    }
-
-    initAuth();
-  }, []);
-
-  const setupUser = useCallback(async (username: string): Promise<void> => {
-    const { user: userData, token: newToken } = await authApi.setup(username);
-    setUser(userData);
-    setToken(newToken);
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
-  }, []);
-
-  const updateUsername = useCallback(async (username: string): Promise<void> => {
-    if (!token) throw new Error('Not authenticated');
-    const { user: userData, token: newToken } = await authApi.updateUsername(username, token);
-    setUser(userData);
-    setToken(newToken);
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
-  }, [token]);
-
-  const logout = useCallback((): void => {
-    authApi.logout().catch(() => {});
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    });
+    return () => unsub();
   }, []);
 
   const refreshUser = useCallback(async (): Promise<void> => {
-    if (!token) return;
+    if (!firebaseAuth.currentUser) return;
     try {
-      const { user: userData } = await authApi.me(token);
-      setUser(userData);
-      localStorage.setItem(USER_KEY, JSON.stringify(userData));
-    } catch (error) {
-      console.error('Failed to refresh user:', error);
+      const { user: backendUser } = await authApi.me();
+      setUser(backendUser);
+    } catch (err) {
+      console.error('Failed to refresh user:', err);
     }
-  }, [token]);
+  }, []);
+
+  const logout = useCallback((): void => {
+    signOut(firebaseAuth).catch(() => {});
+  }, []);
+
+  const signIn = useCallback(async (email: string, password: string): Promise<void> => {
+    await signInWithEmailAndPassword(firebaseAuth, email, password);
+    // onAuthStateChanged effect will update user + token automatically
+  }, []);
+
+  const signUp = useCallback(async (email: string, password: string): Promise<void> => {
+    await createUserWithEmailAndPassword(firebaseAuth, email, password);
+  }, []);
+
+  const signInWithGoogle = useCallback(async (): Promise<void> => {
+    await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
+  }, []);
+
+  const sendPasswordReset = useCallback(async (email: string): Promise<void> => {
+    await sendPasswordResetEmail(firebaseAuth, email);
+  }, []);
+
+  // Legacy compatibility stubs — fspecii's UI still references these but the
+  // sign-in UI now lives in our SignInModal which calls signIn/signUp directly.
+  const setupUser = useCallback(async (_username: string): Promise<void> => {
+    throw new Error('setupUser is deprecated — use signUp(email, password) instead.');
+  }, []);
+  const updateUsername = useCallback(async (_username: string): Promise<void> => {
+    throw new Error('Update display name in Firebase profile instead.');
+  }, []);
 
   const value: AuthContextType = {
-    user,
-    token,
-    isLoading,
-    isAuthenticated,
-    setupUser,
-    updateUsername,
-    logout,
-    refreshUser,
+    user, token, isLoading, isAuthenticated,
+    setupUser, updateUsername, logout, refreshUser,
+    signIn, signUp, signInWithGoogle, sendPasswordReset,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
