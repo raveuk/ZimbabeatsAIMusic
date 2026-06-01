@@ -98,7 +98,7 @@ function AppInner() {
         <StatusBar style="light" />
         <View style={styles.webRow}>
           <View style={styles.sidebar}>
-            <Text style={styles.brand}>AiMusic</Text>
+            <Text style={styles.brand}>Myuzika</Text>
             {navItems.map((n) => (
               <SidebarItem key={n.key} {...n} active={tab === n.key} onPress={() => setTab(n.key)} />
             ))}
@@ -118,7 +118,7 @@ function AppInner() {
     <SafeAreaView style={styles.fill}>
       <StatusBar style="light" />
       <View style={styles.topbar}>
-        <Text style={styles.brand}>AiMusic</Text>
+        <Text style={styles.brand}>Myuzika</Text>
         <TouchableOpacity onPress={logout}>
           <Text style={styles.logout}>Log out</Text>
         </TouchableOpacity>

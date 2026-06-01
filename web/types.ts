@@ -151,5 +151,5 @@ export interface UserProfile {
   };
 }
 
-// Simplified views for ACE-Step UI
+// Simplified views for Myuzika
 export type View = 'create' | 'library' | 'training' | 'profile' | 'song' | 'playlist' | 'search' | 'news';
