@@ -2,7 +2,30 @@ import { auth as firebaseAuth } from './firebase';
 
 // API base — talks to our Next.js backend at api.zimbabeats.com in prod.
 // Override via VITE_API_BASE for local development (e.g. http://127.0.0.1:3000).
-const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) || 'https://api.zimbabeats.com';
+export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) || 'https://api.zimbabeats.com';
+
+// JSON serializer that drops circular refs + non-serializable values (DOM
+// nodes, React fibers, AbortControllers, etc.) instead of throwing. Keeps
+// fetches from blowing up with 'cyclic object value' when an event object
+// or ref accidentally leaks into the request body.
+function safeStringify(value: unknown): string {
+  const seen = new WeakSet();
+  return JSON.stringify(value, (_k, v) => {
+    if (v && typeof v === 'object') {
+      // Skip well-known non-serializable shapes outright.
+      if (
+        v instanceof Element ||
+        v instanceof Event ||
+        v instanceof AbortController ||
+        (typeof File !== 'undefined' && v instanceof File) ||
+        (typeof Blob !== 'undefined' && v instanceof Blob)
+      ) return undefined;
+      if (seen.has(v as object)) return undefined;
+      seen.add(v as object);
+    }
+    return v;
+  });
+}
 
 // Resolve audio/cover URL: append our Firebase ID token as ?token=… so the
 // native browser <audio>/<img> tags can fetch from our authenticated endpoint
@@ -58,7 +81,7 @@ async function api<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body ? safeStringify(body) : undefined,
     // credentials: 'include' is for cookies — our backend uses bearer tokens
     // and CORS would require Access-Control-Allow-Credentials. Drop it.
   });

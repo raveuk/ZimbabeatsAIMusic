@@ -3,7 +3,7 @@ import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash,
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { generateApi } from '../services/api';
+import { generateApi, API_BASE } from '../services/api';
 import { MAIN_STYLES } from '../data/genres';
 import { EditableSlider } from './EditableSlider';
 
@@ -544,7 +544,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   const refreshModels = useCallback(async () => {
     try {
-      const modelsRes = await fetch('/api/generate/models');
+      const modelsRes = await fetch(`${API_BASE}/api/generate/models`);
       if (modelsRes.ok) {
         const data = await modelsRes.json();
         const models = data.models || [];
@@ -569,7 +569,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
       // Fetch limits
       try {
-        const response = await fetch('/api/generate/limits');
+        const response = await fetch(`${API_BASE}/api/generate/limits`);
         if (!response.ok) return;
         const data = await response.json();
         if (typeof data.max_duration_with_lm === 'number') {
@@ -737,7 +737,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     if (!token) return;
     setIsLoadingTracks(true);
     try {
-      const response = await fetch('/api/reference-tracks', {
+      const response = await fetch(`${API_BASE}/api/reference-tracks`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.ok) {
@@ -762,7 +762,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       const formData = new FormData();
       formData.append('audio', file);
 
-      const response = await fetch('/api/reference-tracks', {
+      const response = await fetch(`${API_BASE}/api/reference-tracks`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -798,7 +798,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     const controller = new AbortController();
     transcribeAbortRef.current = controller;
     try {
-      const response = await fetch(`/api/reference-tracks/${trackId}/transcribe`, {
+      const response = await fetch(`${API_BASE}/api/reference-tracks/${trackId}/transcribe`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
@@ -832,7 +832,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const deleteReferenceTrack = async (trackId: string) => {
     if (!token) return;
     try {
-      const response = await fetch(`/api/reference-tracks/${trackId}`, {
+      const response = await fetch(`${API_BASE}/api/reference-tracks/${trackId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -2737,7 +2737,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   // Update track duration in database if not set
                   const track = referenceTracks.find(t => t.id === playingTrackId);
                   if (playingTrackSource === 'uploads' && track && !track.duration && token) {
-                    fetch(`/api/reference-tracks/${track.id}`, {
+                    fetch(`${API_BASE}/api/reference-tracks/${track.id}`, {
                       method: 'PATCH',
                       headers: {
                         'Content-Type': 'application/json',

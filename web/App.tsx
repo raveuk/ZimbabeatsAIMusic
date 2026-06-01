@@ -12,7 +12,7 @@ import { UserProfile } from './components/UserProfile';
 import { SettingsModal } from './components/SettingsModal';
 import { SongProfile } from './components/SongProfile';
 import { Song, GenerationParams, View, Playlist } from './types';
-import { generateApi, songsApi, playlistsApi, getAudioUrl } from './services/api';
+import { generateApi, songsApi, playlistsApi, getAudioUrl, API_BASE } from './services/api';
 import { useAuth } from './context/AuthContext';
 import { useResponsive } from './context/ResponsiveContext';
 import { I18nProvider, useI18n } from './context/I18nContext';
@@ -361,7 +361,7 @@ function AppContent() {
   const loadReferenceTracks = useCallback(async () => {
     if (!isAuthenticated || !token) return;
     try {
-      const response = await fetch('/api/reference-tracks', {
+      const response = await fetch(`${API_BASE}/api/reference-tracks`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!response.ok) return;
@@ -1095,7 +1095,7 @@ function AppContent() {
       onConfirm: async () => {
         setConfirmDialog(null);
         try {
-          const response = await fetch(`/api/reference-tracks/${trackId}`, {
+          const response = await fetch(`${API_BASE}/api/reference-tracks/${trackId}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token!}` }
           });
