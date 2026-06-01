@@ -8,7 +8,10 @@ web-build/
 **/.env
 **/.env.local
 **/.env*.local
-**/data/
+# Only the *server*'s data dir contains the SQLite DB + JWT secret — exclude that
+# specifically. web/data/ ships static config (genres.ts, news.json) that the
+# Vite build needs.
+server/data/
 **/jwt.secret
 
 # Editor/OS junk
