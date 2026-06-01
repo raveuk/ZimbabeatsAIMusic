@@ -1221,6 +1221,26 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         {/* SIMPLE MODE */}
         {!customMode && (
           <div className="space-y-5">
+            {/* Title (Simple) — optional. Used as the track row title in the
+                Library and as the slug in the output filename
+                (music_app/u{user}_t{id}_{slug}.mp3). Bulk-generate appends
+                (1), (2)… per job. Server defaults to "Track #{id}" if blank. */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
+                <span className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Title
+                </span>
+              </div>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Untitled (optional)"
+                maxLength={120}
+                className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
+              />
+            </div>
+
             {/* Song Description */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 flex items-center justify-between border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
