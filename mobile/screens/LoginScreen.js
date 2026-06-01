@@ -51,7 +51,7 @@ export default function LoginScreen({ onAuthed }) {
       <View style={styles.card}>
         <View style={styles.logoWrap}>
           <View style={styles.logoOrb} />
-          <Text style={styles.brand}>Zimbabeats AI</Text>
+          <Text style={styles.brand}>AiMusic</Text>
           <Text style={styles.tagline}>
             {mode === "login" ? "Welcome back. Sign in to keep creating." : "Create your account — make music in seconds."}
           </Text>

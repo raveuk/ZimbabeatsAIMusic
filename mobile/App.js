@@ -70,7 +70,7 @@ function AppInner() {
     <SafeAreaView style={styles.fill}>
       <StatusBar style="light" />
       <View style={styles.topbar}>
-        <Text style={styles.brand}>🎵 AI Music</Text>
+        <Text style={styles.brand}>AiMusic</Text>
         <TouchableOpacity onPress={logout}>
           <Text style={styles.logout}>Log out</Text>
         </TouchableOpacity>
