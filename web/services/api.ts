@@ -376,94 +376,137 @@ export interface GenerationJob {
   error?: string;
 }
 
+// Translate fspecii's GenerationParams into the body our /api/generate expects.
+// Keys map best-effort; unsupported knobs (CFG scale, ADG, repainting, LM
+// settings, source/reference audio) are silently dropped — backend ignores them.
+//
+// Bulk count is *not* sent to the backend; the adapter below fans out N
+// parallel /api/generate calls instead, which gives us per-job track rows.
+function toBackendBody(p: GenerationParams) {
+  // fspecii's audioFormat is 'mp3'|'flac'; our backend accepts MP3 bitrate
+  // strings ('V0'|'128k'|'320k') or undefined. Default to V0 (best VBR).
+  const quality = 'V0';
+  // Use the AI-Enhance / write-lyrics-for-me flow only if there's a theme but
+  // no concrete lyrics yet. Otherwise treat lyrics as user-supplied.
+  const hasLyrics = !!(p.lyrics && p.lyrics.trim());
+  const themeFallback = !hasLyrics ? (p.songDescription || p.prompt) : undefined;
+  const writeLyrics = !hasLyrics && !!themeFallback;
+
+  return {
+    title: p.title || undefined,
+    style: p.style || p.songDescription || p.prompt || '',
+    lyrics: hasLyrics ? p.lyrics : (p.instrumental ? '[inst]' : ''),
+    duration: p.duration,
+    bpm: p.bpm,
+    key: p.keyScale,
+    timesignature: p.timeSignature,
+    language: p.vocalLanguage,
+    quality,
+    steps: p.inferenceSteps,
+    temperature: p.lmTemperature,
+    seed: p.randomSeed ? undefined : p.seed,
+    writeLyrics,
+    theme: writeLyrics ? themeFallback : undefined,
+  };
+}
+
+interface BackendGenerateResponse {
+  trackId: number;
+  promptId: string;
+  coverPromptId?: string;
+  seed: number;
+  duration: number;
+}
+
+// Convert our /api/jobs status into the shape fspecii's polling code expects.
+function toGenerationJob(t: BackendTrack): GenerationJob {
+  const statusMap: Record<BackendTrack['status'], GenerationJob['status']> = {
+    queued: 'queued', running: 'running', done: 'succeeded', error: 'failed',
+  };
+  return {
+    jobId: String(t.id),
+    id: String(t.id),
+    status: statusMap[t.status],
+    queuePosition: t.queuePosition ?? undefined,
+    progress: t.progress?.percent,
+    params: t.params,
+    created_at: t.createdAt,
+    result: t.audioUrl ? {
+      audioUrls: [`${API_BASE}${t.audioUrl}`],
+      duration: typeof t.params.duration === 'number' ? t.params.duration : undefined,
+      bpm:      typeof t.params.bpm === 'number' ? t.params.bpm : undefined,
+      keyScale: typeof t.params.key === 'string' ? t.params.key : undefined,
+      timeSignature: typeof t.params.timesignature === 'string' ? t.params.timesignature : undefined,
+    } : undefined,
+  };
+}
+
 export const generateApi = {
-  startGeneration: (params: GenerationParams, token: string): Promise<GenerationJob> =>
-    api('/api/generate', { method: 'POST', body: params, token }),
-
-  getStatus: (jobId: string, token: string): Promise<GenerationJob> =>
-    api(`/api/generate/status/${jobId}`, { token }),
-
-  getHistory: (token: string): Promise<{ jobs: GenerationJob[] }> =>
-    api('/api/generate/history', { token }),
-
-  uploadAudio: async (file: File, token: string): Promise<{ url: string; key: string }> => {
-    const formData = new FormData();
-    formData.append('audio', file);
-    const response = await fetch(`${API_BASE}/api/generate/upload-audio`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
-      throw new Error(error.details || error.error || 'Upload failed');
-    }
-    return response.json();
+  // Kick off generation. If bulkCount > 1, fan out parallel calls — backend
+  // returns one trackId per job, which the UI then polls via getStatus().
+  startGeneration: async (params: GenerationParams, _token?: string): Promise<GenerationJob> => {
+    const body = toBackendBody(params);
+    const bulk = Math.max(1, Math.min(10, Number(params.batchSize) || 1));
+    const submissions = await Promise.all(
+      Array.from({ length: bulk }, () => api<BackendGenerateResponse>('/api/generate', { method: 'POST', body })),
+    );
+    // The UI only tracks one job-id at a time; return the first. The rest
+    // appear in /api/jobs and the Library polls them independently.
+    const first = submissions[0];
+    return {
+      jobId: String(first.trackId),
+      id: String(first.trackId),
+      status: 'queued',
+      params: body,
+      created_at: new Date().toISOString(),
+    };
   },
 
-  formatInput: (params: {
-    caption: string;
-    lyrics?: string;
-    bpm?: number;
-    duration?: number;
-    keyScale?: string;
-    timeSignature?: string;
-    temperature?: number;
-    topK?: number;
-    topP?: number;
-    lmModel?: string;
-    lmBackend?: string;
-  }, token: string): Promise<{
-    caption?: string;
-    lyrics?: string;
-    bpm?: number;
-    duration?: number;
-    key_scale?: string;
-    vocal_language?: string;
-    time_signature?: string;
-    status_message?: string;
-    error?: string;
-  }> => api('/api/generate/format', { method: 'POST', body: params, token }),
+  getStatus: async (jobId: string, _token?: string): Promise<GenerationJob> => {
+    const t = await api<BackendTrack>(`/api/jobs/${encodeURIComponent(jobId)}`);
+    return toGenerationJob(t);
+  },
 
-  // Random description from Gradio's example library
-  getRandomDescription: (token: string): Promise<{
-    description: string;
-    instrumental: boolean;
-    vocalLanguage: string;
-  }> => api('/api/generate/random-description', { token }),
+  getHistory: async (_token?: string): Promise<{ jobs: GenerationJob[] }> => {
+    const { tracks } = await api<{ tracks: BackendTrack[] }>('/api/jobs');
+    return { jobs: tracks.map(toGenerationJob) };
+  },
 
-  // LoRA Inference (requires ACE-Step training fork)
-  loadLora: (params: {
-    lora_path: string;
-  }, token: string): Promise<{
-    message: string;
-    lora_path: string;
-  }> => api('/api/lora/load', { method: 'POST', body: params, token }),
+  // Reference-audio upload not supported on our backend yet.
+  uploadAudio: async (_file: File, _token?: string): Promise<{ url: string; key: string }> => {
+    throw new Error('Reference audio upload is not available yet.');
+  },
 
-  unloadLora: (token: string): Promise<{
-    message: string;
-  }> => api('/api/lora/unload', { method: 'POST', token }),
+  // "Format" / AI-enhance maps to our /api/lyrics (Ollama-backed lyric writer).
+  // Only the lyrics field is reliably re-derived; everything else echoes back.
+  formatInput: async (params: { caption: string; lyrics?: string; bpm?: number; duration?: number; keyScale?: string; timeSignature?: string }) => {
+    try {
+      const { lyrics } = await api<{ lyrics: string }>('/api/lyrics', { method: 'POST', body: { theme: params.caption, language: 'en' } });
+      return {
+        caption: params.caption,
+        lyrics,
+        bpm: params.bpm,
+        duration: params.duration,
+        key_scale: params.keyScale,
+        time_signature: params.timeSignature,
+        status_message: 'Lyrics generated.',
+      };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : 'Format failed' };
+    }
+  },
 
-  setLoraScale: (params: {
-    scale: number;
-  }, token: string): Promise<{
-    message: string;
-    scale: number;
-  }> => api('/api/lora/scale', { method: 'POST', body: params, token }),
+  // We don't ship random sample prompts — return an empty, neutral default.
+  getRandomDescription: async (): Promise<{ description: string; instrumental: boolean; vocalLanguage: string }> => ({
+    description: '', instrumental: false, vocalLanguage: 'en',
+  }),
 
-  toggleLora: (params: {
-    enabled: boolean;
-  }, token: string): Promise<{
-    message: string;
-    active: boolean;
-  }> => api('/api/lora/toggle', { method: 'POST', body: params, token }),
-
-  getLoraStatus: (token: string): Promise<{
-    loaded: boolean;
-    active: boolean;
-    scale: number;
-    path: string;
-  }> => api('/api/lora/status', { token }),
+  // LoRA / training APIs aren't supported in our stack — stubs prevent crashes.
+  loadLora:     async (_p: { lora_path: string }) => ({ message: 'LoRA not supported here.', lora_path: '' }),
+  unloadLora:   async () => ({ message: 'LoRA not supported here.' }),
+  setLoraScale: async (_p: { scale: number }) => ({ message: 'LoRA not supported here.', scale: 0 }),
+  toggleLora:   async (_p: { enabled: boolean }) => ({ message: 'LoRA not supported here.', active: false }),
+  getLoraStatus: async () => ({ loaded: false, active: false, scale: 0, path: '' }),
 };
 
 // Users API
