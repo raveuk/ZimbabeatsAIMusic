@@ -1,0 +1,74 @@
+diff --git a/rvc/infer/infer.py b/rvc/infer/infer.py
+index 1767a4a8..ccd65bbf 100644
+--- a/rvc/infer/infer.py
++++ b/rvc/infer/infer.py
+@@ -8,19 +8,9 @@ import logging
+ import numpy as np
+ import soundfile as sf
+ import noisereduce as nr
+-from pedalboard import (
+-    Pedalboard,
+-    Chorus,
+-    Distortion,
+-    Reverb,
+-    PitchShift,
+-    Limiter,
+-    Gain,
+-    Bitcrush,
+-    Clipping,
+-    Compressor,
+-    Delay,
+-)
++# pedalboard's compiled extension requires AVX2 and crashes on older CPUs at import.
++# We only need it inside post_process_audio() (optional reverb/chorus/etc. effects),
++# so the import was moved into the function. Training never touches it.
+ 
+ now_dir = os.getcwd()
+ sys.path.append(now_dir)
+@@ -131,6 +121,10 @@ class VoiceConverter:
+         sample_rate,
+         **kwargs,
+     ):
++        from pedalboard import (
++            Pedalboard, Chorus, Distortion, Reverb, PitchShift, Limiter,
++            Gain, Bitcrush, Clipping, Compressor, Delay,
++        )
+         board = Pedalboard()
+         if kwargs.get("reverb", False):
+             reverb = Reverb(
+diff --git a/rvc/realtime/core.py b/rvc/realtime/core.py
+index 97c96d95..39e573a5 100644
+--- a/rvc/realtime/core.py
++++ b/rvc/realtime/core.py
+@@ -6,19 +6,7 @@ import torch.nn.functional as F
+ import torchaudio.transforms as tat
+ import numpy as np
+ from noisereduce.torchgate import TorchGate
+-from pedalboard import (
+-    Pedalboard,
+-    Chorus,
+-    Distortion,
+-    Reverb,
+-    PitchShift,
+-    Limiter,
+-    Gain,
+-    Bitcrush,
+-    Clipping,
+-    Compressor,
+-    Delay,
+-)
++# See infer.py: pedalboard requires AVX2. Imported lazily inside setup_pedalboard().
+ 
+ now_dir = os.getcwd()
+ sys.path.append(now_dir)
+@@ -108,6 +96,10 @@ class Realtime:
+         ).to(self.device)
+ 
+     def setup_pedalboard(self, **kwargs):
++        from pedalboard import (
++            Pedalboard, Chorus, Distortion, Reverb, PitchShift, Limiter,
++            Gain, Bitcrush, Clipping, Compressor, Delay,
++        )
+         board = Pedalboard()
+         if kwargs.get("reverb", False):
+             reverb = Reverb(

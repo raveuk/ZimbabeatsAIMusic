@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.next/
+.expo/
+web-build/
+
+# Local data + secrets — must never be pushed.
+**/.env
+**/.env.local
+**/.env*.local
+**/data/
+**/jwt.secret
+
+# Editor/OS junk
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# Dev artifacts
+dev.log
