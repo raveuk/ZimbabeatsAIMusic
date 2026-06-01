@@ -4,6 +4,7 @@ import { usePlayer } from "../lib/PlayerContext";
 import { getToken } from "../lib/api";
 import { API_BASE } from "../config";
 import { colors, space, radius, typography } from "../lib/theme";
+import GradientCover from "./GradientCover";
 
 // Sticky mini-player rendered above the tab bar. Hidden when nothing is playing.
 // Tap the title area to open the track detail modal later — for now just shows
@@ -43,7 +44,7 @@ export default function MiniPlayer({ onOpen }) {
         >
           {coverHref
             ? <Image source={{ uri: coverHref }} style={styles.cover} />
-            : <View style={[styles.cover, styles.coverPh]} />}
+            : <GradientCover track={current} style={styles.cover} showGlyph={false} />}
           <View style={styles.meta}>
             <Text style={styles.title} numberOfLines={1}>{current.title || `Track #${current.id}`}</Text>
             <Text style={styles.sub} numberOfLines={1}>

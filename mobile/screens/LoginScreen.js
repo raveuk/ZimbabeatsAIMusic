@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     marginBottom: space.md,
     // simple radial glow effect on web
-    boxShadow: "0 0 24px rgba(255, 106, 61, 0.5)",
+    boxShadow: "0 0 24px rgba(255, 105, 180, 0.5)",
   },
   brand: { ...typography.h2, color: colors.text, textAlign: "center" },
   tagline: { ...typography.meta, color: colors.textMute, textAlign: "center", marginTop: space.xs },

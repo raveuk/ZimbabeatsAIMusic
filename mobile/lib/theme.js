@@ -16,10 +16,10 @@ export const colors = {
   textMute:  "#a5a5b8",
   textFade:  "#6b6b80",
 
-  // Accent — warm orange, Suno-ish.
-  accent:    "#ff6a3d",
-  accentSoft:"#ff8a5c",
-  accentDeep:"#e0481f",
+  // Accent — hot pink (matches fspecii/ace-step-ui).
+  accent:    "#ff69b4",
+  accentSoft:"#ff8fc8",
+  accentDeep:"#e84697",
 
   // Status.
   success:   "#22c55e",

@@ -4,6 +4,7 @@ import { usePlayer } from "../lib/PlayerContext";
 import { getToken } from "../lib/api";
 import { API_BASE } from "../config";
 import { colors, space, radius, typography } from "../lib/theme";
+import GradientCover from "./GradientCover";
 
 // Single track tile for the Library grid. Big square cover, status overlay
 // while generating, hover/press play button bottom-right. Designed to be
@@ -39,11 +40,7 @@ export default function TrackCard({ track, onPress, renderActions }) {
       <TouchableOpacity activeOpacity={0.85} onPress={() => onPress?.(track)} style={styles.coverWrap}>
         {coverHref
           ? <Image source={{ uri: coverHref }} style={styles.cover} />
-          : (
-            <View style={[styles.cover, styles.coverPh]}>
-              <Text style={styles.coverPhIcon}>🎵</Text>
-            </View>
-          )}
+          : <GradientCover track={track} style={styles.cover} />}
 
         {/* Status pill in top-left while generating / on error. */}
         {generating || errored ? (
@@ -105,7 +102,7 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: radius.pill,
     backgroundColor: colors.accent,
     alignItems: "center", justifyContent: "center",
-    ...(Platform.OS === "web" ? { boxShadow: "0 6px 16px rgba(255, 106, 61, 0.5)" } : {}),
+    ...(Platform.OS === "web" ? { boxShadow: "0 6px 16px rgba(255, 105, 180, 0.5)" } : {}),
   },
   playIcon: { color: "#fff", fontSize: 18, fontWeight: "700" },
   playBtnGhost: {
