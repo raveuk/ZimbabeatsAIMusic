@@ -174,6 +174,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [thinking, setThinking] = useState(false); // Default false for GPU compatibility
   const [enhance, setEnhance] = useState(false); // AI Enhance: uses LLM to enrich caption & generate metadata
   const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>('mp3');
+  // MP3 bitrate quality (only used when audioFormat='mp3'). Persists across
+  // sessions so the user doesn't have to reselect.
+  const [mp3Quality, setMp3Quality] = useState<'V0' | '128k' | '320k'>(() => {
+    const stored = localStorage.getItem('mp3Quality');
+    return stored === '128k' || stored === '320k' ? stored : 'V0';
+  });
+  useEffect(() => { try { localStorage.setItem('mp3Quality', mp3Quality); } catch {} }, [mp3Quality]);
   const [inferenceSteps, setInferenceSteps] = useState(12);
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('ode');
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>('pt');
@@ -1035,6 +1042,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         thinking,
         enhance,
         audioFormat,
+        mp3Quality,
         inferMethod,
         lmBackend,
         lmModel,
@@ -1457,6 +1465,27 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
                 />
                 <p className="text-[10px] text-zinc-500">{t('numberOfVariations')}</p>
+              </div>
+
+              {/* MP3 Quality — feeds ACE-Step's SaveAudioMP3 'quality' input.
+                  Default is V0 (best VBR, ~220-260 kbps); 320k is max CBR;
+                  128k is the small-file option. */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider px-1 flex items-center justify-between">
+                  <span>MP3 Quality</span>
+                  <span className="text-[10px] font-normal text-zinc-400 dark:text-zinc-500 normal-case tracking-normal">
+                    {mp3Quality === 'V0' ? '~220-260 kbps' : mp3Quality === '320k' ? '320 kbps CBR' : '128 kbps'}
+                  </span>
+                </label>
+                <select
+                  value={mp3Quality}
+                  onChange={(e) => setMp3Quality(e.target.value as 'V0' | '128k' | '320k')}
+                  className="w-full bg-white dark:bg-suno-card border border-zinc-200 dark:border-white/5 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
+                >
+                  <option value="V0">V0 — Best VBR</option>
+                  <option value="320k">320k — Highest CBR</option>
+                  <option value="128k">128k — Smaller file</option>
+                </select>
               </div>
             </div>
           </div>

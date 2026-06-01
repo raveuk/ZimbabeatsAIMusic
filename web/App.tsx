@@ -857,6 +857,7 @@ function AppContent() {
         seed: params.seed,
         thinking: params.thinking,
         audioFormat: params.audioFormat,
+        mp3Quality: params.mp3Quality,
         inferMethod: params.inferMethod,
         shift: params.shift,
         lmTemperature: params.lmTemperature,

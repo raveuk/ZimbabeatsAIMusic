@@ -366,6 +366,9 @@ export interface GenerationParams {
   seed?: number;
   thinking?: boolean;
   audioFormat?: 'mp3' | 'flac';
+  // MP3 bitrate (only relevant when audioFormat is mp3). Forwarded to ACE-Step's
+  // SaveAudioMP3 node as `quality`. V0 = best VBR; 320k = max CBR; 128k = small.
+  mp3Quality?: 'V0' | '128k' | '320k';
   inferMethod?: 'ode' | 'sde';
   shift?: number;
 
@@ -438,7 +441,8 @@ export interface GenerationJob {
 function toBackendBody(p: GenerationParams) {
   // the upstream audioFormat is 'mp3'|'flac'; our backend accepts MP3 bitrate
   // strings ('V0'|'128k'|'320k') or undefined. Default to V0 (best VBR).
-  const quality = 'V0';
+  const allowed: Array<'V0' | '128k' | '320k'> = ['V0', '128k', '320k'];
+  const quality = (p.mp3Quality && allowed.includes(p.mp3Quality)) ? p.mp3Quality : 'V0';
   // Use the AI-Enhance / write-lyrics-for-me flow only if there's a theme but
   // no concrete lyrics yet. Otherwise treat lyrics as user-supplied.
   const hasLyrics = !!(p.lyrics && p.lyrics.trim());
