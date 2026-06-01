@@ -572,9 +572,9 @@ const SongItem: React.FC<SongItemProps> = ({
                 )}
 
                 {song.isGenerating ? (
-                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1">
+                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-1.5">
                         {song.queuePosition ? (
-                            /* Queue indicator */
+                            /* Queue indicator — comes BEFORE generation actually starts. */
                             <>
                                 <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
                                     <Clock size={16} className="text-amber-400" />
@@ -582,13 +582,31 @@ const SongItem: React.FC<SongItemProps> = ({
                                 <span className="text-[10px] font-medium text-amber-400">Queue #{song.queuePosition}</span>
                             </>
                         ) : (
-                            /* Generating - Music Waveform Animation */
-                            <div className="flex items-end gap-1 h-6">
-                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.0s' }}></div>
-                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.2s' }}></div>
-                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.4s' }}></div>
-                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.1s' }}></div>
-                            </div>
+                            <>
+                                <div className="flex items-end gap-1 h-5">
+                                    <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.0s' }}></div>
+                                    <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.2s' }}></div>
+                                    <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.4s' }}></div>
+                                    <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.1s' }}></div>
+                                </div>
+                                {/* Percent label + slim progress bar. song.progress is a
+                                    fraction 0..1 (App.tsx normalises the backend's 0..100). */}
+                                {typeof song.progress === 'number' && song.progress > 0 ? (
+                                    <>
+                                        <span className="text-[10px] font-semibold text-pink-300 tabular-nums">
+                                            {Math.round(song.progress * 100)}%
+                                        </span>
+                                        <div className="w-12 h-1 bg-black/40 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-pink-500 transition-all duration-500"
+                                                style={{ width: `${Math.min(100, Math.max(0, song.progress * 100))}%` }}
+                                            />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <span className="text-[10px] font-medium text-pink-300/80">Generating…</span>
+                                )}
+                            </>
                         )}
                     </div>
                 ) : (
