@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from "react-native";
 import { api, setToken } from "../lib/api";
+
+const isWeb = Platform.OS === "web";
 
 export default function LoginScreen({ onAuthed }) {
   const [mode, setMode] = useState("login"); // or "register"
@@ -18,6 +20,20 @@ export default function LoginScreen({ onAuthed }) {
       );
     } catch (e) {
       Alert.alert("Couldn't send", e.message);
+    }
+  }
+
+  async function google() {
+    setBusy(true);
+    try {
+      const res = await api.google();
+      await setToken(res.token);
+      onAuthed(res.user);
+    } catch (e) {
+      // popup-closed / popup-blocked / unauthorized-domain — show the message.
+      Alert.alert("Google sign-in failed", e.message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -59,6 +75,20 @@ export default function LoginScreen({ onAuthed }) {
       <TouchableOpacity style={styles.button} onPress={submit} disabled={busy}>
         {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{mode === "login" ? "Log in" : "Sign up"}</Text>}
       </TouchableOpacity>
+
+      {isWeb && (
+        <>
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+          <TouchableOpacity style={styles.googleBtn} onPress={google} disabled={busy}>
+            <Text style={styles.googleText}>Continue with Google</Text>
+          </TouchableOpacity>
+        </>
+      )}
+
       <TouchableOpacity onPress={() => setMode(mode === "login" ? "register" : "login")}>
         <Text style={styles.switch}>
           {mode === "login" ? "Need an account? Sign up" : "Have an account? Log in"}
@@ -85,6 +115,11 @@ const styles = StyleSheet.create({
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   switch: { color: "#8a7cff", textAlign: "center", marginTop: 20 },
   forgot: { color: "#888", textAlign: "center", marginTop: 14, fontSize: 13 },
+  dividerRow: { flexDirection: "row", alignItems: "center", marginTop: 18, marginBottom: 4 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "#2a2a38" },
+  dividerText: { color: "#666", marginHorizontal: 10, fontSize: 12 },
+  googleBtn: { backgroundColor: "#fff", borderRadius: 12, padding: 14, alignItems: "center", marginTop: 8 },
+  googleText: { color: "#1f1f24", fontSize: 15, fontWeight: "600" },
   credit: { color: "#555", textAlign: "center", marginTop: 36, fontSize: 12, fontWeight: "600", letterSpacing: 0.5 },
   copyright: { color: "#444", textAlign: "center", marginTop: 4, fontSize: 11 },
 });
