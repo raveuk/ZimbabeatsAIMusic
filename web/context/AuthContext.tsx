@@ -11,9 +11,10 @@ import {
 import { authApi, User, _setCurrentUserForSongMapper, _setCurrentTokenForSongMapper } from '../services/api';
 import { auth as firebaseAuth } from '../services/firebase';
 
-// AuthContext that surfaces Firebase sign-in to fspecii's existing UI.
-// We keep the same shape they expect (user, token, isAuthenticated, logout,
-// setupUser, …) so SongList / Player / RightSidebar etc. work unchanged.
+// AuthContext that surfaces Firebase sign-in to the existing UI components.
+// We keep the same shape the upstream UI expects (user, token,
+// isAuthenticated, logout, setupUser, …) so SongList / Player /
+// RightSidebar etc. work unchanged.
 //
 // Two flow shifts vs upstream:
 //   - There's no "auto-login as the only local user" path anymore — Firebase
@@ -114,8 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     await sendPasswordResetEmail(firebaseAuth, email);
   }, []);
 
-  // Legacy compatibility stubs — fspecii's UI still references these but the
-  // sign-in UI now lives in our SignInModal which calls signIn/signUp directly.
+  // Legacy compatibility stubs — older code paths in the upstream UI still
+  // reference these. The actual sign-in UI now lives in our SignInModal which
+  // calls signIn/signUp directly.
   const setupUser = useCallback(async (_username: string): Promise<void> => {
     throw new Error('setupUser is deprecated — use signUp(email, password) instead.');
   }, []);

@@ -221,13 +221,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                             <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
                                 {t('poweredBy')}
                             </p>
-                            <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700/50 mt-4 space-y-4">
-                                <div>
-                                    <p className="text-zinc-900 dark:text-white font-medium mb-2">{t('createdBy')}</p>
-                                    <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                                        © {new Date().getFullYear()} Myuzika · All rights reserved.
-                                    </p>
-                                </div>
+                            <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700/50 mt-4 space-y-2">
+                                <p className="text-zinc-900 dark:text-white font-medium">{t('createdBy')}</p>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                                    © {new Date().getFullYear()} <a href="https://zimbabeats.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-pink-500">Zimbabeats.com</a> · All rights reserved.
+                                </p>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                                    Myuzika and the Myuzika logo are trademarks of Zimbabeats.com.
+                                </p>
                             </div>
                         </div>
                     </div>

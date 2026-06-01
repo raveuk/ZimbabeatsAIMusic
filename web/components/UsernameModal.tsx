@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Lock, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-// Sign-in / sign-up modal. Replaces fspecii's username-only flow.
+// Sign-in / sign-up modal. Replaces the upstream UI's username-only flow.
 // Mounted in App.tsx as <UsernameModal isOpen=… onSubmit=… />; we ignore both
 // props and drive visibility off the auth context (modal is only visible when
 // the user is not authenticated and auth bootstrapping has finished).

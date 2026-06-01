@@ -88,8 +88,8 @@ export interface AuthResponse {
   token: string;
 }
 
-// Adapt our backend's user row to fspecii's expected User shape. Our backend
-// returns { id, email, role, disabled, track_quota, firebase_uid }; fspecii's
+// Adapt our backend's user row to our upstream UI's expected User shape. Our backend
+// returns { id, email, role, disabled, track_quota, firebase_uid }; the upstream UI's
 // UI expects { id, username, isAdmin, ... }. Username is derived from the
 // part of the email before the '@'.
 interface BackendUser {
@@ -115,7 +115,7 @@ export const authApi = {
     return { user: toFspeciiUser(user) };
   },
 
-  // Compatibility stubs — fspecii's UI calls these but on our app the entire
+  // Compatibility stubs — the upstream UI calls these but on our app the entire
   // auth lifecycle is handled by Firebase (sign-in, sign-up, sign-out). The
   // AuthContext below short-circuits these and never calls the API path.
   auto: async (): Promise<AuthResponse> => {
@@ -184,7 +184,7 @@ interface BackendTrack {
   coverPending: boolean;
 }
 
-// Map our /api/jobs track row to fspecii's Song shape. fspecii's UI reads
+// Map our /api/jobs track row to the upstream Song shape. the upstream UI reads
 // BOTH camelCase and snake_case keys for some fields (audio_url AND audioUrl,
 // like_count AND likeCount, etc.) — we populate both for safety.
 function toFspeciiSong(t: BackendTrack, currentUser?: User | null): Song {
@@ -392,14 +392,14 @@ export interface GenerationJob {
   error?: string;
 }
 
-// Translate fspecii's GenerationParams into the body our /api/generate expects.
+// Translate the upstream GenerationParams into the body our /api/generate expects.
 // Keys map best-effort; unsupported knobs (CFG scale, ADG, repainting, LM
 // settings, source/reference audio) are silently dropped — backend ignores them.
 //
 // Bulk count is *not* sent to the backend; the adapter below fans out N
 // parallel /api/generate calls instead, which gives us per-job track rows.
 function toBackendBody(p: GenerationParams) {
-  // fspecii's audioFormat is 'mp3'|'flac'; our backend accepts MP3 bitrate
+  // the upstream audioFormat is 'mp3'|'flac'; our backend accepts MP3 bitrate
   // strings ('V0'|'128k'|'320k') or undefined. Default to V0 (best VBR).
   const quality = 'V0';
   // Use the AI-Enhance / write-lyrics-for-me flow only if there's a theme but
@@ -434,7 +434,7 @@ interface BackendGenerateResponse {
   duration: number;
 }
 
-// Convert our /api/jobs status into the shape fspecii's polling code expects.
+// Convert our /api/jobs status into the shape the upstream polling code expects.
 function toGenerationJob(t: BackendTrack): GenerationJob {
   const statusMap: Record<BackendTrack['status'], GenerationJob['status']> = {
     queued: 'queued', running: 'running', done: 'succeeded', error: 'failed',
