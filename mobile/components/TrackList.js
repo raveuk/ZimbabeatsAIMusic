@@ -2,9 +2,9 @@ import { useState } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Alert, Platform, Image,
 } from "react-native";
-import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { authHeader, getToken } from "../lib/api";
 import { getItem, setItem } from "../lib/storage";
+import { usePlayer } from "../lib/PlayerContext";
 import { API_BASE } from "../config";
 
 const isWeb = Platform.OS === "web";
@@ -31,13 +31,12 @@ const safeFile = (s) => String(s || "").replace(/[^\w\-]+/g, "_").replace(/^_+|_
 // Reusable list of tracks with inline playback. `renderActions(track)` lets each
 // screen add its own row actions (delete, add-to-playlist, remove-from-playlist).
 export default function TrackList({ tracks, refreshing, onRefresh, header, emptyText, renderActions, onPressItem }) {
-  const [playingId, setPlayingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   // Map of trackId -> fully-built signed cover URL (with ?token=…).
   // Recomputed when item.coverUrl changes (regenerate gives a new ?v=…).
   const [coverUrls, setCoverUrls] = useState({});
-  const player = useAudioPlayer();
-  const status = useAudioPlayerStatus(player);
+  // Single global player — same instance no matter which screen the list is on.
+  const player = usePlayer();
 
   function ensureCoverUrl(item) {
     const cur = coverUrls[item.id];
@@ -103,22 +102,12 @@ export default function TrackList({ tracks, refreshing, onRefresh, header, empty
   }
 
   async function play(track) {
-    if (playingId === track.id) {
-      status.playing ? player.pause() : player.play();
-      return;
-    }
-    // Pass the JWT in the URL — Android's ExoPlayer is unreliable about
-    // forwarding the Authorization header, which makes the audio endpoint
-    // return a 401 JSON body that ExoPlayer then crashes trying to decode.
-    const url = await authedUrl(track.audioUrl);
-    if (!url) return;
-    player.replace({ uri: url });
-    player.play();
-    setPlayingId(track.id);
+    // Hand off to the global player — it handles signed-URL + toggle logic.
+    await player.play(track);
   }
 
   function renderItem({ item }) {
-    const isPlaying = playingId === item.id && status.playing;
+    const isPlaying = player.current?.id === item.id && player.playing;
     const done = item.status === "done";
     const generating = item.status === "queued" || item.status === "running";
     const pct = item.progress?.percent;

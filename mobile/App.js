@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform }
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { getToken, setToken, api } from "./lib/api";
+import { PlayerProvider } from "./lib/PlayerContext";
+import MiniPlayer from "./components/MiniPlayer";
 import LoginScreen from "./screens/LoginScreen";
 import CreateScreen from "./screens/CreateScreen";
 import LibraryScreen from "./screens/LibraryScreen";
@@ -12,14 +14,19 @@ import AdminScreen from "./screens/AdminScreen";
 export default function App() {
   return (
     <SafeAreaProvider>
-      {/* On web/desktop the RN layout stretches to the full viewport which
-          looks awful for a phone-shaped app. Cap the UI at a phone-ish width
-          and centre it; on native this wrapper is a transparent pass-through. */}
-      <View style={styles.outer}>
-        <View style={styles.shell}>
-          <AppInner />
+      {/* PlayerProvider must wrap the whole tree so the audio player keeps
+          playing as the user switches tabs — it lives outside AppInner so it
+          survives any logout-driven remount of the screens themselves. */}
+      <PlayerProvider>
+        {/* On web/desktop the RN layout stretches to the full viewport which
+            looks awful for a phone-shaped app. Cap the UI at a phone-ish width
+            and centre it; on native this wrapper is a transparent pass-through. */}
+        <View style={styles.outer}>
+          <View style={styles.shell}>
+            <AppInner />
+          </View>
         </View>
-      </View>
+      </PlayerProvider>
     </SafeAreaProvider>
   );
 }
@@ -82,6 +89,8 @@ function AppInner() {
         {tab === "playlists" && <PlaylistsScreen />}
         {tab === "admin" && isAdmin && <AdminScreen currentUser={user} />}
       </View>
+
+      <MiniPlayer />
 
       <View style={styles.tabbar}>
         <Tab label="Create" active={tab === "create"} onPress={() => setTab("create")} />
