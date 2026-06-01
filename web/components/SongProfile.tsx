@@ -64,7 +64,7 @@ const updateMetaTags = (song: Song) => {
 
 const resetMetaTags = () => {
     document.title = 'Myuzika - Local AI Music Generator';
-    const defaultDescription = 'Create original music with AI locally. Generate songs in any style with custom lyrics and professional quality using ACE-Step.';
+    const defaultDescription = 'Create original AI music in any style with custom lyrics and professional quality — on Myuzika.';
     const defaultImage = '/og-image.png';
 
     const updateMeta = (selector: string, content: string) => {
