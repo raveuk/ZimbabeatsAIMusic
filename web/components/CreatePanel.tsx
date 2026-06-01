@@ -150,7 +150,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   // Common
   const [instrumental, setInstrumental] = useState(false);
   const [vocalLanguage, setVocalLanguage] = useState('en');
-  const [vocalGender, setVocalGender] = useState<'male' | 'female' | ''>('');
+  const [vocalGender, setVocalGender] = useState<'male' | 'female' | 'both' | ''>('');
 
   // Music Parameters
   const [bpm, setBpm] = useState(0);
@@ -976,10 +976,29 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   };
 
   const handleGenerate = () => {
+    // Vocal gender isn't a separate ACE-Step input — we just append a hint
+    // ("Male vocals" / "Female vocals") to whichever source the model uses
+    // as its style tag. In Custom mode that's the `style` field; in Simple
+    // mode it's `songDescription`. Without the mode-aware split, picking a
+    // gender in Simple mode would wipe out the description.
+    // 'both' = male/female duet — ACE-Step listens for these phrases in tags.
+    const genderHint =
+      vocalGender === 'male'   ? 'Male vocals'   :
+      vocalGender === 'female' ? 'Female vocals' :
+      vocalGender === 'both'   ? 'Male and female vocals, duet' :
+      '';
     const styleWithGender = (() => {
-      if (!vocalGender) return style;
-      const genderHint = vocalGender === 'male' ? 'Male vocals' : 'Female vocals';
-      const trimmed = style.trim();
+      if (customMode) {
+        if (!genderHint) return style;
+        const trimmed = style.trim();
+        return trimmed ? `${trimmed}\n${genderHint}` : genderHint;
+      }
+      // Simple mode: don't touch style; we append the hint to songDescription below.
+      return style;
+    })();
+    const descriptionWithGender = (() => {
+      if (customMode || !genderHint) return songDescription;
+      const trimmed = songDescription.trim();
       return trimmed ? `${trimmed}\n${genderHint}` : genderHint;
     })();
 
@@ -996,7 +1015,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
       onGenerate({
         customMode,
-        songDescription: customMode ? undefined : songDescription,
+        songDescription: customMode ? undefined : descriptionWithGender,
         prompt: lyrics,
         lyrics,
         style: styleWithGender,
@@ -1328,18 +1347,26 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide px-1">
                   {t('vocalGender')}
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setVocalGender(vocalGender === 'male' ? '' : 'male')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'male' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'male' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('male')}
                   </button>
                   <button
                     type="button"
+                    onClick={() => setVocalGender(vocalGender === 'both' ? '' : 'both')}
+                    title="Male + female duet"
+                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'both' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                  >
+                    Both
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setVocalGender(vocalGender === 'female' ? '' : 'female')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'female' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'female' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('female')}
                   </button>
@@ -1784,18 +1811,26 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide px-1">
                   {t('vocalGender')}
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setVocalGender(vocalGender === 'male' ? '' : 'male')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'male' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'male' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('male')}
                   </button>
                   <button
                     type="button"
+                    onClick={() => setVocalGender(vocalGender === 'both' ? '' : 'both')}
+                    title="Male + female duet"
+                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'both' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                  >
+                    Both
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setVocalGender(vocalGender === 'female' ? '' : 'female')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'female' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'female' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
                   >
                     {t('female')}
                   </button>
