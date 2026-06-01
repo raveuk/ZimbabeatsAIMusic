@@ -228,7 +228,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return localStorage.getItem('ace-model') || 'acestep-v15-turbo-shift3';
+    // Default to Studio (XL SFT) — best quality. Persists across sessions.
+    return localStorage.getItem('ace-model') || 'studio';
   });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -237,38 +238,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   // Available models fetched from backend
   const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
 
-  // Fallback model list when backend is unavailable
-  const availableModels = useMemo(() => {
-    if (fetchedModels.length > 0) {
-      return fetchedModels.map(m => ({ id: m.name, name: m.name }));
-    }
-    return [
-      { id: 'acestep-v15-base', name: 'acestep-v15-base' },
-      { id: 'acestep-v15-sft', name: 'acestep-v15-sft' },
-      { id: 'acestep-v15-turbo', name: 'acestep-v15-turbo' },
-      { id: 'acestep-v15-turbo-shift1', name: 'acestep-v15-turbo-shift1' },
-      { id: 'acestep-v15-turbo-shift3', name: 'acestep-v15-turbo-shift3' },
-      { id: 'acestep-v15-turbo-continuous', name: 'acestep-v15-turbo-continuous' },
-    ];
-  }, [fetchedModels]);
+  // Model list — only the two we actually have installed and route to on the
+// backend. "studio" picks acestep_v1.5_xl_sft_bf16 (best quality), "turbo"
+// picks the smaller turbo for fast generation. Anything else falls back to
+// studio server-side.
+  const availableModels = useMemo(() => [
+    { id: 'studio', name: 'Studio' },
+    { id: 'turbo',  name: 'Turbo' },
+  ], []);
 
-  // Map model ID to short display name
   const getModelDisplayName = (modelId: string): string => {
     const mapping: Record<string, string> = {
-      'acestep-v15-base': '1.5B',
-      'acestep-v15-sft': '1.5S',
-      'acestep-v15-turbo-shift1': '1.5TS1',
-      'acestep-v15-turbo-shift3': '1.5TS3',
-      'acestep-v15-turbo-continuous': '1.5TC',
-      'acestep-v15-turbo': '1.5T',
+      studio: 'Studio',
+      turbo:  'Turbo',
     };
-    return mapping[modelId] || modelId;
+    return mapping[modelId] || 'Studio';
   };
 
-  // Check if model is a turbo variant
-  const isTurboModel = (modelId: string): boolean => {
-    return modelId.includes('turbo');
-  };
+  // Treat turbo selection specially in the UI (smaller step counts make sense).
+  const isTurboModel = (modelId: string): boolean => modelId === 'turbo';
 
   const [isUploadingReference, setIsUploadingReference] = useState(false);
   const [isUploadingSource, setIsUploadingSource] = useState(false);

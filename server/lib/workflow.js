@@ -17,6 +17,16 @@ const PROMPT_NODE = "94"; // TextEncodeAceStepAudio1.5
 const LATENT_NODE = "98"; // EmptyAceStep1.5LatentAudio
 const SAMPLER_NODE = "3"; // KSampler
 const SAVE_NODE = "107"; // SaveAudioMP3
+const UNET_NODE = "104"; // UNETLoader
+
+// Map the dropdown selector (sent by the UI as `ditModel`) to the actual
+// safetensors file ComfyUI should load. Unknown values fall through to studio,
+// which is the highest-quality option. "studio" stays default-on for new users
+// unless they explicitly switch in the UI.
+const MODEL_FILES = {
+  studio: "acestep_v1.5_xl_sft_bf16.safetensors",
+  turbo:  "acestep_v1.5_turbo.safetensors",
+};
 
 // --- Voice cloning (RVC inside the ComfyUI graph) --------------------------
 // Optional second template that adds, after VAEDecodeAudio: stem-separation ->
@@ -92,6 +102,11 @@ export function buildGraph(input) {
   g[LATENT_NODE].inputs.seconds = duration;
   g[SAMPLER_NODE].inputs.seed = seed;
   if (input.steps != null) g[SAMPLER_NODE].inputs.steps = clamp(Number(input.steps), 1, 60);
+
+  // Switch the UNET model based on the UI's ditModel selection. The graph
+  // template ships pointing at studio (XL SFT); flip to turbo when requested.
+  const modelFile = MODEL_FILES[String(input.ditModel || "").toLowerCase()] || MODEL_FILES.studio;
+  if (g[UNET_NODE]) g[UNET_NODE].inputs.unet_name = modelFile;
 
   g[saveNode].inputs.filename_prefix = input.filenamePrefix || "music_app/track";
   if (input.quality && MP3_QUALITIES.includes(input.quality)) {

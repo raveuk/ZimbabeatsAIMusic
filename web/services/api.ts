@@ -407,6 +407,10 @@ function toBackendBody(p: GenerationParams) {
   const hasLyrics = !!(p.lyrics && p.lyrics.trim());
   const themeFallback = !hasLyrics ? (p.songDescription || p.prompt) : undefined;
   const writeLyrics = !hasLyrics && !!themeFallback;
+  // Backend only accepts 'studio' (XL SFT, default) or 'turbo'. Coerce
+  // anything else — including the upstream UI's old turbo-shift variants — to
+  // studio. Studio is also the explicit fallback for missing values.
+  const ditModel = p.ditModel === 'turbo' ? 'turbo' : 'studio';
 
   return {
     title: p.title || undefined,
@@ -423,6 +427,7 @@ function toBackendBody(p: GenerationParams) {
     seed: p.randomSeed ? undefined : p.seed,
     writeLyrics,
     theme: writeLyrics ? themeFallback : undefined,
+    ditModel,
   };
 }
 
