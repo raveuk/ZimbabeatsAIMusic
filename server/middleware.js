@@ -3,11 +3,16 @@
 // Native Expo (iOS/Android) ignores CORS entirely, so this is purely for web.
 import { NextResponse } from "next/server";
 
-// Origins allowed to call the API. Localhost is for `expo start --web` dev.
-// *.pages.dev covers every Cloudflare Pages deploy (prod + preview branches).
+// Origins allowed to call the API. Localhost is for `expo start --web` dev
+// and the Vite dev server (port 3000/5173). *.pages.dev covers every
+// Cloudflare Pages deploy (prod + preview branches).
 const ALLOWED = new Set([
+  "https://myuzika.com",
+  "https://www.myuzika.com",
   "https://app.zimbabeats.com",
   "https://zimbabeats.com",
+  "http://localhost:3000",
+  "http://localhost:5173",
   "http://localhost:8081",
   "http://localhost:8082",
   "http://localhost:19006",
