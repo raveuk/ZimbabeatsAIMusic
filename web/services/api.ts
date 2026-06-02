@@ -551,6 +551,9 @@ function toBackendBody(p: GenerationParams) {
     quality,
     steps:          num(p.inferenceSteps),
     temperature:    typeof p.lmTemperature === 'number' ? p.lmTemperature : undefined,
+    cfgScale:       typeof p.lmCfgScale === 'number' && p.lmCfgScale > 0 ? p.lmCfgScale : undefined,
+    topP:           typeof p.lmTopP === 'number' && p.lmTopP > 0 && p.lmTopP <= 1 ? p.lmTopP : undefined,
+    topK:           typeof p.lmTopK === 'number' && p.lmTopK >= 0 ? p.lmTopK : undefined,
     shift:          typeof p.shift === 'number' && p.shift > 0 ? p.shift : undefined,
     // randomSeed=true or seed=-1 (CreatePanel's sentinel for "random") -> undefined.
     seed: p.randomSeed ? undefined : (typeof p.seed === 'number' && p.seed >= 0 ? p.seed : undefined),

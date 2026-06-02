@@ -100,6 +100,12 @@ export function buildGraph(input) {
   // Vocal "crispness" — lower temperature => more confident pronunciation.
   // Sane range is ~0.4–1.2; the template default is 0.7.
   if (input.temperature != null) p.temperature = clamp(Number(input.temperature), 0.2, 1.5);
+  // LM sampling knobs on the same TextEncode node. cfg_scale is the LM's
+  // own classifier-free guidance (distinct from the diffusion KSampler.cfg).
+  // top_p ∈ (0,1]; top_k=0 disables top-k filtering (pure top-p sampling).
+  if (input.cfgScale != null) p.cfg_scale = clamp(Number(input.cfgScale), 0.5, 10);
+  if (input.topP     != null) p.top_p     = clamp(Number(input.topP),     0.01, 1);
+  if (input.topK     != null) p.top_k     = Math.max(0, Math.min(500, Math.floor(Number(input.topK))));
 
   g[LATENT_NODE].inputs.seconds = duration;
   g[SAMPLER_NODE].inputs.seed = seed;
