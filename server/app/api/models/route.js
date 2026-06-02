@@ -16,17 +16,31 @@ function slug(file) {
   return file.replace(/\.safetensors$/i, "").replace(/[^a-z0-9_]+/gi, "_");
 }
 
-// Human label: pull the parameter-size hint out of the filename when present
-// (qwen_4b_ace15 -> "4B", acestep_v1.5_xl_sft_bf16 -> "XL SFT bf16").
+// Human label — translates the technical filename into a brand-neutral name
+// the user sees in the picker. Hides "qwen", parameter counts, and quant
+// suffixes. Updated this table when adding new models so the UI stays clean.
 function labelFor(file) {
-  const base = file.replace(/\.safetensors$/i, "");
-  const m = base.match(/[_-]([0-9]+(?:\.[0-9]+)?[bm])(?:[_-]|$)/i);
-  if (m) return m[1].toUpperCase();
-  return base
+  const lower = file.toLowerCase();
+  // Lyric/tags encoders (DualCLIPLoader)
+  if (lower.includes("qwen_0.6b") || lower.includes("qwen_0_6b")) return "Fast";
+  if (lower.includes("qwen_1.7b") || lower.includes("qwen_1_7b")) return "Standard";
+  if (lower.includes("qwen_4b"))                                  return "Best";
+  // UNET diffusion models
+  if (lower.includes("xl_sft"))     return "Studio (Best)";
+  if (lower.includes("xl_turbo"))   return "Turbo XL";
+  if (lower.includes("xl_base"))    return "XL Base";
+  if (lower.includes("v1.5_turbo")) return "Turbo";
+  if (lower.includes("v1.5_base") || lower.includes("v1.5") || lower.includes("v1_5")) return "Base";
+  // Cover-art checkpoints
+  if (lower.includes("juggernaut")) return "Juggernaut (Photoreal)";
+  if (lower.includes("sd_xl_base")) return "SDXL Base";
+  // Fallback: strip extension + known prefixes; never leak "qwen" / "acestep".
+  return file
+    .replace(/\.safetensors$/i, "")
     .replace(/^acestep[_-]v?1\.5[_-]?/i, "")
     .replace(/^qwen[_-]/i, "")
     .replace(/_/g, " ")
-    .trim();
+    .trim() || "Default";
 }
 
 function loadJSON(file) {
