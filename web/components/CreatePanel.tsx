@@ -189,11 +189,24 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     return stored === '128k' || stored === '320k' ? stored : 'V0';
   });
   useEffect(() => { try { localStorage.setItem('mp3Quality', mp3Quality); } catch {} }, [mp3Quality]);
-  const [inferenceSteps, setInferenceSteps] = useState(12);
+  // Inference steps — was 12 (turbo-tier) which made Studio output noisy.
+  // 30 is the XL SFT default the backend template ships with; matches what
+  // the mobile app effectively used. Persist the last value so users who
+  // intentionally lowered it for Turbo speed don't get bumped back to 30.
+  const [inferenceSteps, setInferenceSteps] = useState<number>(() => {
+    const stored = parseInt(localStorage.getItem('ace-inferenceSteps') || '', 10);
+    return Number.isFinite(stored) && stored >= 8 && stored <= 60 ? stored : 30;
+  });
+  useEffect(() => {
+    try { localStorage.setItem('ace-inferenceSteps', String(inferenceSteps)); } catch {}
+  }, [inferenceSteps]);
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('ode');
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>('pt');
+  // Default to the 4B variant — that's what ComfyUI's DualCLIPLoader actually
+  // loads on our backend (qwen_4b_ace15.safetensors), so the UI shouldn't
+  // imply the user is on the 0.6B encoder.
   const [lmModel, setLmModel] = useState(() => {
-    return localStorage.getItem('ace-lmModel') || 'acestep-5Hz-lm-0.6B';
+    return localStorage.getItem('ace-lmModel') || 'acestep-5Hz-lm-4B';
   });
   const [shift, setShift] = useState(3.0);
 
@@ -740,7 +753,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         temperature: lmTemperature,
         topK: lmTopK > 0 ? lmTopK : undefined,
         topP: lmTopP,
-        lmModel: lmModel || 'acestep-5Hz-lm-0.6B',
+        lmModel: lmModel || 'acestep-5Hz-lm-4B',
         lmBackend: lmBackend || 'pt',
       }, token);
 
