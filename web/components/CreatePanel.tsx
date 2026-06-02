@@ -3,7 +3,7 @@ import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash,
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { generateApi, lyricsApi, API_BASE } from '../services/api';
+import { generateApi, lyricsApi, modelsApi, API_BASE, ConfiguredModel } from '../services/api';
 import { MAIN_STYLES } from '../data/genres';
 import { EditableSlider } from './EditableSlider';
 
@@ -202,12 +202,28 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   }, [inferenceSteps]);
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('ode');
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>('pt');
-  // Default to the 4B variant — that's what ComfyUI's DualCLIPLoader actually
-  // loads on our backend (qwen_4b_ace15.safetensors), so the UI shouldn't
-  // imply the user is on the 0.6B encoder.
-  const [lmModel, setLmModel] = useState(() => {
-    return localStorage.getItem('ace-lmModel') || 'acestep-5Hz-lm-4B';
-  });
+  // LM Model dropdown is hydrated from /api/models (which reads the live
+  // workflow JSON on the backend). lmModel holds the user's pick; if the
+  // saved pick is no longer in the live list it's coerced to the first
+  // configured model. Starts empty until the fetch lands.
+  const [lmModelOptions, setLmModelOptions] = useState<ConfiguredModel[]>([]);
+  const [lmModel, setLmModel] = useState<string>(() => localStorage.getItem('ace-lmModel') || '');
+  useEffect(() => {
+    let cancelled = false;
+    modelsApi.list().then(({ lmModels }) => {
+      if (cancelled) return;
+      // Only expose the lyric encoder to the user — the tags encoder is
+      // mechanically paired with it in the DualCLIPLoader; users care about
+      // the model that actually shapes their lyrics.
+      const lyric = lmModels.filter((m) => m.role === 'lyrics' || lmModels.length === 1);
+      setLmModelOptions(lyric);
+      setLmModel((prev) => {
+        if (prev && lyric.some((m) => m.id === prev)) return prev;
+        return lyric[0]?.id ?? '';
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const [shift, setShift] = useState(3.0);
 
   // LM Parameters (under Expert)
@@ -2194,9 +2210,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 onChange={(e) => { const v = e.target.value; setLmModel(v); localStorage.setItem('ace-lmModel', v); }}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
               >
-                <option value="acestep-5Hz-lm-0.6B">{t('lmModel06B')}</option>
-                <option value="acestep-5Hz-lm-1.7B">{t('lmModel17B')}</option>
-                <option value="acestep-5Hz-lm-4B">{t('lmModel4B')}</option>
+                {lmModelOptions.length > 0 ? (
+                  lmModelOptions.map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))
+                ) : (
+                  <option value="">Loading…</option>
+                )}
               </select>
               <p className="text-[10px] text-zinc-500">{t('lmModelHint')}</p>
             </div>

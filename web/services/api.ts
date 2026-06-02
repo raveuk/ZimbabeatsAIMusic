@@ -259,6 +259,15 @@ function withSignedToken(url: string | undefined): string | undefined {
   return `${url}${sep}token=${encodeURIComponent(_currentTokenCache)}`;
 }
 
+// Model catalogue — reads the live workflow JSONs on the backend and reports
+// the exact files in use. The CreatePanel hydrates its LM Model / UNET /
+// cover-checkpoint pickers from this so the UI never drifts from reality.
+export interface ConfiguredModel { id: string; file: string; label: string; role?: string }
+export const modelsApi = {
+  list: async (): Promise<{ lmModels: ConfiguredModel[]; unetModels: ConfiguredModel[]; coverModels: ConfiguredModel[] }> =>
+    api('/api/models'),
+};
+
 // Standalone lyric-writer endpoint — used by the Create panel's "Write
 // lyrics" / "Regenerate" buttons. Hits our backend's /api/lyrics route,
 // which is Ollama-backed.
