@@ -1372,17 +1372,32 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                     Lyrics
                   </span>
-                  <button
-                    type="button"
-                    disabled={!songDescription.trim() || writingSimpleLyrics}
-                    onClick={writeSimpleLyrics}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold text-pink-600 dark:text-pink-400 hover:bg-pink-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    title={lyrics ? 'Regenerate lyrics from the description above' : 'Generate lyrics from the description above'}
-                  >
-                    {writingSimpleLyrics
-                      ? (<><Loader2 size={12} className="animate-spin" /> Writing…</>)
-                      : (<><Sparkles size={12} /> {lyrics ? 'Regenerate' : 'Write lyrics'}</>)}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {/* CoT "Smart" toggle — surfaces the existing `thinking`
+                        state right next to the Write lyrics button so users
+                        don't have to switch to Custom mode to enable it.
+                        On = the model plans before writing (slower, tighter). */}
+                    <button
+                      type="button"
+                      onClick={() => setThinking(!thinking)}
+                      disabled={writingSimpleLyrics}
+                      title={thinking ? 'Smart mode ON — model plans before writing (slower, tighter lyrics)' : 'Smart mode OFF — faster, looser lyrics'}
+                      className={`px-2 py-1 rounded-md text-[10px] font-semibold border transition-colors ${thinking ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-500 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-white/20'} disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >
+                      Smart
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!songDescription.trim() || writingSimpleLyrics}
+                      onClick={writeSimpleLyrics}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold text-pink-600 dark:text-pink-400 hover:bg-pink-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      title={lyrics ? 'Regenerate lyrics from the description above' : 'Generate lyrics from the description above'}
+                    >
+                      {writingSimpleLyrics
+                        ? (<><Loader2 size={12} className="animate-spin" /> Writing…</>)
+                        : (<><Sparkles size={12} /> {lyrics ? 'Regenerate' : 'Write lyrics'}</>)}
+                    </button>
+                  </div>
                 </div>
                 {/* Read-only in Simple mode — the box shows AI-generated
                     lyrics only. Users who want to type their own switch to
