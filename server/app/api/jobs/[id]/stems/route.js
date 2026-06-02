@@ -65,12 +65,18 @@ export const POST = handler(async (req, ctx) => {
     return json({ error: "stem separation failed", detail: entry?.status?.messages || null }, 502);
   }
 
-  // Pull each save node's output and pack into a clean response.
+  // Build stems from disk, not from ComfyUI's `outputs` map. Reason:
+  // re-running the exact same prompt hits ComfyUI's prompt cache and the
+  // history entry comes back with `outputs: {}` — even though the files
+  // are present on disk from the previous run. Scanning the output dir
+  // is the reliable check.
   const stems = {};
-  for (const [nodeId, name] of Object.entries({ "4": "vocals", "5": "bass", "6": "drums", "7": "other" })) {
-    const out = entry.outputs?.[nodeId];
-    const filename = out?.audio?.[0]?.filename;
-    if (filename) stems[name] = `/api/stems/${row.id}/${name}`;
+  const prefix = `u${user.id}_t${row.id}${slug ? `_${slug}` : ""}_stems_`;
+  let files = [];
+  try { files = fs.readdirSync(OUTPUT_DIR); } catch {}
+  for (const name of ["vocals", "bass", "drums", "other"]) {
+    const exists = files.some((f) => f.startsWith(`${prefix}${name}_`) && f.endsWith(".mp3"));
+    if (exists) stems[name] = `/api/stems/${row.id}/${name}`;
   }
 
   return json({ ok: true, promptId, stems });

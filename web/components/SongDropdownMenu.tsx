@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Song } from '../types';
 import { useI18n } from '../context/I18nContext';
-import { songsApi } from '../services/api';
+import { StemsModal } from './StemsModal';
 import {
     Video,
     Edit3,
@@ -80,6 +80,7 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
 }) => {
     const { t } = useI18n();
     const menuRef = useRef<HTMLDivElement>(null);
+    const [stemsOpen, setStemsOpen] = useState(false);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -105,7 +106,9 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
         };
     }, [isOpen, onClose]);
 
-    if (!isOpen) return null;
+    // Stems modal can outlive the dropdown — keep rendering when stemsOpen
+    // even after isOpen has flipped to false.
+    if (!isOpen && !stemsOpen) return null;
 
     const handleAction = (action?: () => void) => {
         if (action) {
@@ -123,27 +126,13 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
         onClose();
     };
 
-    // Calls our backend /api/jobs/:id/stems (Demucs htdemucs). Demucs takes
-    // ~30–60s on a 3090, so we show a single browser prompt with the four
-    // signed stem URLs once it's done. Quick MVP — replace with a proper
-    // panel when we have a place for it in the song-detail sidebar.
-    const handleExtractStems = async () => {
+    // StemsModal open flag is at component scope below (above the early
+    // return that bails when !open). The handler just flips it on; we
+    // close the dropdown immediately so the modal sits cleanly on top.
+    const handleExtractStems = () => {
         if (!song.id) return;
+        setStemsOpen(true);
         onClose();
-        try {
-            // Optimistic UX cue. Replace with a toast once we have a global
-            // toast handler reachable from this component.
-            console.log('[stems] starting Demucs on track', song.id);
-            const { stems } = await songsApi.extractStems(String(song.id));
-            const links = ['vocals', 'bass', 'drums', 'other']
-                .map((s) => stems[s] ? `${s}: ${stems[s]}` : `${s}: (missing)`).join('\n');
-            window.prompt('Stems ready — copy a link to download:', links);
-        } catch (e) {
-            const msg = e instanceof Error ? e.message : 'Stem extraction failed';
-            console.error('[stems]', msg);
-            // eslint-disable-next-line no-alert
-            window.alert(`Stem extraction failed:\n${msg}`);
-        }
     };
 
     const handleDownload = async () => {
@@ -178,6 +167,8 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
         : 'animate-in fade-in slide-in-from-top-2';
 
     return (
+        <>
+        {isOpen && (
         <div
             ref={menuRef}
             className={`absolute ${positionClasses} ${directionClasses} w-52
@@ -259,5 +250,15 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
                 </>
             )}
         </div>
+        )}
+
+        {stemsOpen && (
+            <StemsModal
+                songId={String(song.id)}
+                songTitle={song.title}
+                onClose={() => setStemsOpen(false)}
+            />
+        )}
+        </>
     );
 };
