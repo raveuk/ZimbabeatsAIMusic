@@ -22,8 +22,9 @@ const UNET_NODE = "104"; // UNETLoader
 // Map the dropdown selector (sent by the UI as `ditModel`) to the actual
 // safetensors file ComfyUI should load. Unknown values fall through to studio,
 // which is the highest-quality option. "studio" stays default-on for new users
-// unless they explicitly switch in the UI.
-const MODEL_FILES = {
+// unless they explicitly switch in the UI. Exported so /api/models can build
+// the UNET dropdown from this table — single source of truth.
+export const MODEL_FILES = {
   studio: "acestep_v1.5_xl_sft_bf16.safetensors",
   turbo:  "acestep_v1.5_turbo.safetensors",
 };

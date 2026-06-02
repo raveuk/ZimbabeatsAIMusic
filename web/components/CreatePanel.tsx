@@ -286,25 +286,36 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   // Available models fetched from backend
   const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
 
-  // Model list — only the two we actually have installed and route to on the
-// backend. "studio" picks acestep_v1.5_xl_sft_bf16 (best quality), "turbo"
-// picks the smaller turbo for fast generation. Anything else falls back to
-// studio server-side.
-  const availableModels = useMemo(() => [
-    { id: 'studio', name: 'Studio' },
-    { id: 'turbo',  name: 'Turbo' },
-  ], []);
+  // UNET model dropdown — sourced from /api/models so the list matches the
+  // server's MODEL_FILES table exactly. id = the slug the backend expects
+  // as `ditModel` (e.g. 'studio'); label is the human-facing string the
+  // backend computed via labelFor (e.g. 'XL SFT Studio (Best)').
+  const [unetModelOptions, setUnetModelOptions] = useState<ConfiguredModel[]>([
+    { id: 'studio', file: '', label: 'Studio' }, // fallback while /api/models loads
+    { id: 'turbo',  file: '', label: 'Turbo' },
+  ]);
+  useEffect(() => {
+    let cancelled = false;
+    modelsApi.list().then(({ unetModels }) => {
+      if (cancelled || !unetModels?.length) return;
+      setUnetModelOptions(unetModels);
+      // If saved pick isn't in the live list, coerce to the first one
+      setSelectedModel((prev) => unetModels.some((m) => m.id === prev) ? prev : unetModels[0].id);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
-  const getModelDisplayName = (modelId: string): string => {
-    const mapping: Record<string, string> = {
-      studio: 'Studio',
-      turbo:  'Turbo',
-    };
-    return mapping[modelId] || 'Studio';
-  };
+  const availableModels = useMemo(
+    () => unetModelOptions.map((m) => ({ id: m.id, name: m.label })),
+    [unetModelOptions],
+  );
+
+  const getModelDisplayName = useCallback((modelId: string): string => {
+    return unetModelOptions.find((m) => m.id === modelId)?.label || modelId;
+  }, [unetModelOptions]);
 
   // Treat turbo selection specially in the UI (smaller step counts make sense).
-  const isTurboModel = (modelId: string): boolean => modelId === 'turbo';
+  const isTurboModel = (modelId: string): boolean => modelId === 'turbo' || modelId.toLowerCase().includes('turbo');
 
   const [isUploadingReference, setIsUploadingReference] = useState(false);
   const [isUploadingSource, setIsUploadingSource] = useState(false);

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { json, handler } from "../../../lib/api.js";
+import { MODEL_FILES } from "../../../lib/workflow.js";
 
 // Inspects the live ACE-Step workflow + cover workflow and reports every
 // model file they currently reference. The UI can populate dropdowns from
@@ -54,7 +55,6 @@ export const GET = handler(async () => {
   const cover = loadJSON("workflow.cover.api.json") || {};
 
   const lmModels = [];
-  const unetModels = [];
   const coverModels = [];
 
   for (const node of Object.values(audio)) {
@@ -64,10 +64,6 @@ export const GET = handler(async () => {
       if (c1) lmModels.push({ id: slug(c1), file: c1, role: "tags",   label: labelFor(c1) });
       if (c2) lmModels.push({ id: slug(c2), file: c2, role: "lyrics", label: labelFor(c2) });
     }
-    if (node?.class_type === "UNETLoader") {
-      const u = node.inputs?.unet_name;
-      if (u) unetModels.push({ id: slug(u), file: u, label: labelFor(u) });
-    }
   }
   for (const node of Object.values(cover)) {
     if (node?.class_type === "CheckpointLoaderSimple") {
@@ -75,6 +71,15 @@ export const GET = handler(async () => {
       if (c) coverModels.push({ id: slug(c), file: c, label: labelFor(c) });
     }
   }
+
+  // UNET options come from MODEL_FILES (the runtime switch table) — not from
+  // the workflow JSON, which only carries the default. ids match what the
+  // frontend already sends as `ditModel` (studio / turbo / …).
+  const unetModels = Object.entries(MODEL_FILES).map(([id, file]) => ({
+    id,
+    file,
+    label: labelFor(file),
+  }));
 
   return json({ lmModels, unetModels, coverModels });
 });
