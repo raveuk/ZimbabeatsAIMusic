@@ -28,11 +28,11 @@ function labelFor(file) {
   if (lower.includes("qwen_1.7b") || lower.includes("qwen_1_7b")) return "1.7B Standard";
   if (lower.includes("qwen_4b"))                                  return "4B Best";
   // UNET diffusion models
-  if (lower.includes("xl_sft"))     return "XL SFT Studio (Best)";
-  if (lower.includes("xl_turbo"))   return "XL Turbo";
+  if (lower.includes("xl_sft"))     return "Studio (Best)";
+  if (lower.includes("xl_turbo"))   return "Turbo XL";
   if (lower.includes("xl_base"))    return "XL Base";
-  if (lower.includes("v1.5_turbo")) return "v1.5 Turbo";
-  if (lower.includes("v1.5_base") || lower.includes("v1.5") || lower.includes("v1_5")) return "v1.5 Base";
+  if (lower.includes("v1.5_turbo")) return "1.5v Turbo";
+  if (lower.includes("v1.5_base") || lower.includes("v1.5") || lower.includes("v1_5")) return "1.5v Base";
   // Cover-art checkpoints
   if (lower.includes("juggernaut")) return "Juggernaut XL (Photoreal)";
   if (lower.includes("sd_xl_base")) return "SDXL Base";
