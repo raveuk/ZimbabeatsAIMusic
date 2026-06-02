@@ -48,6 +48,7 @@ export const POST = handler(async (req) => {
     timesignature: body.timesignature,
     steps: body.steps,             // KSampler iterations (advanced)
     temperature: body.temperature, // vocal pronunciation confidence (advanced)
+    shift: body.shift,             // ModelSamplingAuraFlow shift (advanced)
     quality: body.quality,         // MP3 bitrate: "V0" | "128k" | "320k"
     ditModel: body.ditModel,       // "studio" (XL SFT) | "turbo" — picks UNET file
     voiceModel: body.voiceModel ?? null, // trained RVC voice (.pth filename) or null

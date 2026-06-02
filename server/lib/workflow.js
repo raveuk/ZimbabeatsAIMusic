@@ -18,6 +18,7 @@ const LATENT_NODE = "98"; // EmptyAceStep1.5LatentAudio
 const SAMPLER_NODE = "3"; // KSampler
 const SAVE_NODE = "107"; // SaveAudioMP3
 const UNET_NODE = "104"; // UNETLoader
+const SHIFT_NODE = "78"; // ModelSamplingAuraFlow
 
 // Map the dropdown selector (sent by the UI as `ditModel`) to the actual
 // safetensors file ComfyUI should load. Unknown values fall through to studio,
@@ -108,6 +109,14 @@ export function buildGraph(input) {
   // template ships pointing at studio (XL SFT); flip to turbo when requested.
   const modelFile = MODEL_FILES[String(input.ditModel || "").toLowerCase()] || MODEL_FILES.studio;
   if (g[UNET_NODE]) g[UNET_NODE].inputs.unet_name = modelFile;
+
+  // ModelSamplingAuraFlow.shift — controls how the diffusion sampler
+  // redistributes denoising effort across timesteps. Useful for the base/SFT
+  // models; the label warns it's not effective for turbo. Clamp to a sane
+  // range (1–7 is the practically useful band).
+  if (input.shift != null && g[SHIFT_NODE]) {
+    g[SHIFT_NODE].inputs.shift = clamp(Number(input.shift), 1, 7);
+  }
 
   g[saveNode].inputs.filename_prefix = input.filenamePrefix || "music_app/track";
   if (input.quality && MP3_QUALITIES.includes(input.quality)) {

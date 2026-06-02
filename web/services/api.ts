@@ -551,6 +551,7 @@ function toBackendBody(p: GenerationParams) {
     quality,
     steps:          num(p.inferenceSteps),
     temperature:    typeof p.lmTemperature === 'number' ? p.lmTemperature : undefined,
+    shift:          typeof p.shift === 'number' && p.shift > 0 ? p.shift : undefined,
     // randomSeed=true or seed=-1 (CreatePanel's sentinel for "random") -> undefined.
     seed: p.randomSeed ? undefined : (typeof p.seed === 'number' && p.seed >= 0 ? p.seed : undefined),
     writeLyrics,
