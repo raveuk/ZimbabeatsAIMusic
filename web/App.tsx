@@ -714,16 +714,23 @@ function AppContent() {
         })(),
       }));
 
-      // Preserve any generating songs that aren't in the loaded list
+      // Preserve any generating *temp* songs whose real backend row isn't in
+      // the loaded list yet. Once the backend track shows up (we map jobId
+      // -> tempId via activeJobsRef), drop the temp duplicate — otherwise
+      // the UI shows two "Generating…" cards for one actual job.
+      const loadedIds = new Set(loadedSongs.map(s => s.id));
+      const stillNeededTempIds = new Set<string>();
+      activeJobsRef.current.forEach(({ tempId }, jobId) => {
+        if (!loadedIds.has(jobId)) stillNeededTempIds.add(tempId);
+      });
       setSongs(prev => {
-        const generatingSongs = prev.filter(s => s.isGenerating);
+        const generatingSongs = prev.filter(s => s.isGenerating && stillNeededTempIds.has(s.id));
         const mergedSongs = [...generatingSongs];
         for (const song of loadedSongs) {
           if (!mergedSongs.some(s => s.id === song.id)) {
             mergedSongs.push(song);
           }
         }
-        // Sort by creation date, newest first
         return mergedSongs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       });
 
