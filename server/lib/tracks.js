@@ -54,5 +54,6 @@ export function publicTrack(t) {
     // True when a cover prompt was submitted but the file isn't on the DB yet.
     // The app uses this to keep polling /api/jobs until the cover lands.
     coverPending: !!(t.cover_prompt_id && !t.cover_filename),
+    isPublic: !!t.is_public,
   };
 }

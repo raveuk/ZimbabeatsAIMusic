@@ -280,10 +280,18 @@ export const songsApi = {
     };
   },
 
-  // Public/featured feeds aren't supported on our backend yet — return [] so
-  // the UI shows empty states instead of crashing on 404s.
-  getPublicSongs:   async (_l?: number, _o?: number): Promise<{ songs: Song[] }> => ({ songs: [] }),
-  getFeaturedSongs: async (): Promise<{ songs: Song[] }> => ({ songs: [] }),
+  // Cross-user discovery: public-only, status='done', newest first.
+  getPublicSongs: async (limit = 20, offset = 0): Promise<{ songs: Song[] }> => {
+    const { tracks } = await api<{ tracks: (BackendTrack & { creator?: string })[] }>(
+      `/api/songs/public?limit=${limit}&offset=${offset}`,
+    );
+    return { songs: tracks.map((t) => ({ ...toFspeciiSong(t, ctx()), creator: t.creator ?? '' })) };
+  },
+  getFeaturedSongs: async (): Promise<{ songs: Song[] }> => {
+    const { tracks } = await api<{ tracks: (BackendTrack & { creator?: string })[] }>('/api/songs/public/featured');
+    return { songs: tracks.map((t) => ({ ...toFspeciiSong(t, ctx()), creator: t.creator ?? '' })) };
+  },
+  // Likes aren't modelled yet — keep an empty list so the UI shows an empty state.
   getLikedSongs:    async (_token?: string): Promise<{ songs: Song[] }> => ({ songs: [] }),
 
   getSong: async (id: string, _token?: string | null): Promise<{ song: Song }> => {
@@ -313,10 +321,16 @@ export const songsApi = {
   deleteSong: (id: string, _token?: string): Promise<{ success: boolean }> =>
     api(`/api/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-  // Likes / privacy / play-count not modelled server-side; treat as no-ops.
-  toggleLike:    async (_id: string, _token?: string): Promise<{ liked: boolean }>   => ({ liked: false }),
-  togglePrivacy: async (_id: string, _token?: string): Promise<{ isPublic: boolean }> => ({ isPublic: false }),
+  // Likes / play-count not modelled server-side; treat as no-ops.
+  toggleLike:    async (_id: string, _token?: string): Promise<{ liked: boolean }> => ({ liked: false }),
   trackPlay:     async (_id: string, _token?: string | null): Promise<{ viewCount: number }> => ({ viewCount: 0 }),
+
+  // Privacy IS wired — flips tracks.is_public on the row. Toggle by passing
+  // no body, or set explicitly via { isPublic }.
+  togglePrivacy: async (id: string, _token?: string): Promise<{ isPublic: boolean }> => {
+    const r = await api<{ id: number; isPublic: boolean }>(`/api/jobs/${encodeURIComponent(id)}/privacy`, { method: 'PATCH' });
+    return { isPublic: r.isPublic };
+  },
 
   // Comments not yet implemented — return empty / reject.
   getComments:   async (_id: string, _token?: string | null): Promise<{ comments: Comment[] }> => ({ comments: [] }),
@@ -598,15 +612,26 @@ const emptyUserProfile: UserProfile = {
 };
 export const usersApi = {
   getProfile: async (username: string, _t?: string | null): Promise<{ user: UserProfile }> => {
-    // Best-effort: if the requested username matches our current user, hand
-    // back our local profile so "View Profile" doesn't 404.
-    const me = ctx();
-    if (me && me.username === username) return { user: { ...emptyUserProfile, ...me } };
-    return { user: { ...emptyUserProfile, username } };
+    try {
+      const { user } = await api<{ user: UserProfile }>(`/api/users/${encodeURIComponent(username)}`);
+      return { user };
+    } catch {
+      return { user: { ...emptyUserProfile, username } };
+    }
   },
-  getPublicSongs:      async (_u: string): Promise<{ songs: Song[] }> => ({ songs: [] }),
+  getPublicSongs: async (username: string): Promise<{ songs: Song[] }> => {
+    try {
+      const { tracks } = await api<{ tracks: (BackendTrack & { creator?: string })[] }>(`/api/users/${encodeURIComponent(username)}/songs`);
+      return { songs: tracks.map((t) => ({ ...toFspeciiSong(t, ctx()), creator: t.creator ?? username })) };
+    } catch {
+      return { songs: [] };
+    }
+  },
   getPublicPlaylists:  async (_u: string): Promise<{ playlists: any[] }> => ({ playlists: [] }),
-  getFeaturedCreators: async (): Promise<{ creators: Array<UserProfile & { follower_count?: number }> }> => ({ creators: [] }),
+  getFeaturedCreators: async (): Promise<{ creators: Array<UserProfile & { follower_count?: number }> }> => {
+    try { return await api<{ creators: Array<UserProfile & { follower_count?: number }> }>('/api/users/public/featured'); }
+    catch { return { creators: [] }; }
+  },
   updateProfile:       async (_updates: Partial<User>, _t?: string): Promise<{ user: User }> => { throw new Error('Profile editing is not available yet.'); },
   uploadAvatar:        async (_f: File, _t?: string): Promise<{ user: UserProfile; url: string }> => { throw new Error('Avatar uploads are not available yet.'); },
   uploadBanner:        async (_f: File, _t?: string): Promise<{ user: UserProfile; url: string }> => { throw new Error('Banner uploads are not available yet.'); },
@@ -705,19 +730,36 @@ export interface SearchResult {
 }
 
 export const searchApi = {
-  // Backend doesn't have a search endpoint yet, so filter the user's own
-  // library client-side on title/style/lyrics. Public discovery is empty for
-  // now — surfaces as "no results" rather than a fetch error.
-  search: async (query: string, _type?: 'songs' | 'creators' | 'playlists' | 'all'): Promise<SearchResult> => {
-    const q = (query || '').toLowerCase().trim();
+  // Cross-user public search (songs + creators). Backend filters on
+  // tracks.is_public + status='done'. Empty query short-circuits.
+  search: async (query: string, type: 'songs' | 'creators' | 'playlists' | 'all' = 'all'): Promise<SearchResult> => {
+    const q = (query || '').trim();
     if (!q) return { songs: [], creators: [], playlists: [] };
-    const { songs } = await songsApi.getMySongs();
-    const matched = songs.filter((s) =>
-      s.title.toLowerCase().includes(q)
-      || (s.style || '').toLowerCase().includes(q)
-      || (s.lyrics || '').toLowerCase().includes(q),
-    );
-    return { songs: matched, creators: [], playlists: [] };
+    try {
+      const r = await api<{
+        songs: (BackendTrack & { creator?: string })[];
+        creators: Array<UserProfile & { follower_count?: number }>;
+        playlists: Array<Playlist & { creator?: string; creator_avatar?: string }>;
+      }>(`/api/search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`);
+      return {
+        songs: (r.songs || []).map((t) => ({ ...toFspeciiSong(t, ctx()), creator: t.creator ?? '' })),
+        creators: r.creators || [],
+        playlists: r.playlists || [],
+      };
+    } catch {
+      // Fall back to local-library filter if the public endpoint is down.
+      const lower = q.toLowerCase();
+      const { songs } = await songsApi.getMySongs();
+      return {
+        songs: songs.filter((s) =>
+          s.title.toLowerCase().includes(lower)
+          || (s.style || '').toLowerCase().includes(lower)
+          || (s.lyrics || '').toLowerCase().includes(lower),
+        ),
+        creators: [],
+        playlists: [],
+      };
+    }
   },
 };
 
