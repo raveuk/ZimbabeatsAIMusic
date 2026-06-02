@@ -1,7 +1,29 @@
 // Refresh a track's status against ComfyUI and persist any terminal result.
+import fs from "node:fs";
+import path from "node:path";
 import { db } from "./db.js";
 import { getHistory, getQueueState, summarizeHistory } from "./comfy.js";
 import { progressFor } from "./progress.js";
+
+// ComfyUI's history is in-memory and capped — old prompts get evicted. When
+// that happens our refresh path gets nothing back and the DB row stays as
+// 'running' forever. As a fallback, scan the output dir for a file matching
+// the predictable naming pattern: music_app/u{user_id}_t{track_id}*.mp3
+const OUTPUT_DIR = path.join(process.env.COMFYUI_ROOT || "/home/raveuk/comfy/ComfyUI", "output", "music_app");
+function findAudioOnDisk(userId, trackId) {
+  try {
+    const prefix = `u${userId}_t${trackId}_`;
+    const matches = fs.readdirSync(OUTPUT_DIR).filter((f) => f.startsWith(prefix) && f.endsWith(".mp3") && !f.includes("_cover"));
+    return matches[0] || null;
+  } catch { return null; }
+}
+function findCoverOnDisk(userId, trackId) {
+  try {
+    const prefix = `u${userId}_t${trackId}_`;
+    const matches = fs.readdirSync(OUTPUT_DIR).filter((f) => f.startsWith(prefix) && f.endsWith(".png") && f.includes("_cover"));
+    return matches[0] || null;
+  } catch { return null; }
+}
 
 // Audio + cover refresh from ComfyUI history. Cover lives in a separate prompt
 // and may finish before, after, or alongside the audio — we update each
@@ -20,7 +42,22 @@ export async function refreshTrack(track) {
       t = { ...t, status: "error", error };
     } else {
       const queue = await getQueueState(t.prompt_id);
-      t = { ...t, status: queue.running ? "running" : "queued", queuePosition: queue.position };
+      // Fallback: ComfyUI's history forgot this prompt AND it's not in the
+      // queue. Look for the output file on disk — if present, it actually
+      // finished (history just rolled over). Otherwise leave as
+      // running/queued for now.
+      if (!queue.running && queue.position == null) {
+        const found = findAudioOnDisk(t.user_id, t.id);
+        if (found) {
+          db.prepare("UPDATE tracks SET status = 'done', filename = ?, subfolder = ? WHERE id = ?")
+            .run(found, "music_app", t.id);
+          t = { ...t, status: "done", filename: found, subfolder: "music_app" };
+        } else {
+          t = { ...t, status: "queued", queuePosition: null };
+        }
+      } else {
+        t = { ...t, status: queue.running ? "running" : "queued", queuePosition: queue.position };
+      }
     }
   }
   // Cover can land independently — check it whenever it's still unknown.
@@ -32,6 +69,14 @@ export async function refreshTrack(track) {
       db.prepare("UPDATE tracks SET cover_filename = ?, cover_subfolder = ? WHERE id = ?")
         .run(img.filename, img.subfolder || "", t.id);
       t = { ...t, cover_filename: img.filename, cover_subfolder: img.subfolder || "" };
+    } else {
+      // Same disk-fallback for the cover when ComfyUI's history rolled over.
+      const found = findCoverOnDisk(t.user_id, t.id);
+      if (found) {
+        db.prepare("UPDATE tracks SET cover_filename = ?, cover_subfolder = ? WHERE id = ?")
+          .run(found, "music_app", t.id);
+        t = { ...t, cover_filename: found, cover_subfolder: "music_app" };
+      }
     }
   }
   return t;
