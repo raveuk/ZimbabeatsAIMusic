@@ -383,6 +383,27 @@ export const songsApi = {
   deleteSong: (id: string, _token?: string): Promise<{ success: boolean }> =>
     api(`/api/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
+  // List every track that already has stems on disk. Each entry comes back
+  // with stems URLs pre-signed with the Firebase token so they're directly
+  // playable / downloadable.
+  listStems: async (): Promise<{ tracks: Array<{ id: number; title: string; createdAt: string; audioUrl: string | null; coverUrl: string | null; stems: Record<string, string> }> }> => {
+    const { tracks } = await api<{ tracks: Array<{ id: number; title: string; createdAt: string; audioUrl: string | null; coverUrl: string | null; stems: Record<string, string> }> }>('/api/stems');
+    const tok = await firebaseAuth.currentUser?.getIdToken();
+    const sign = (u: string | null) => {
+      if (!u) return null;
+      const abs = `${API_BASE}${u}`;
+      return tok ? `${abs}${abs.includes('?') ? '&' : '?'}token=${encodeURIComponent(tok)}` : abs;
+    };
+    return {
+      tracks: tracks.map((t) => ({
+        ...t,
+        audioUrl: sign(t.audioUrl),
+        coverUrl: sign(t.coverUrl),
+        stems: Object.fromEntries(Object.entries(t.stems).map(([k, v]) => [k, sign(v)!])),
+      })),
+    };
+  },
+
   // Run Demucs htdemucs on the finished track. ~30–60s wall time on a 3090.
   // Returns auth'd stem URLs (vocals/bass/drums/other) that the UI can hand
   // straight to <audio> or download links.
