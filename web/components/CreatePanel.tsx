@@ -133,7 +133,15 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   }, []);
 
   // Mode
-  const [customMode, setCustomMode] = useState(true);
+  // Default to Simple mode on first launch. Persist the user's pick so
+  // returning users land back in the same mode they last used.
+  const [customMode, setCustomMode] = useState<boolean>(() => {
+    const stored = localStorage.getItem('ace-customMode');
+    return stored === '1';
+  });
+  useEffect(() => {
+    try { localStorage.setItem('ace-customMode', customMode ? '1' : '0'); } catch {}
+  }, [customMode]);
 
   // Simple Mode
   const [songDescription, setSongDescription] = useState('');
