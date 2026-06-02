@@ -4,37 +4,25 @@
     "inputs": {
       "audio": "PLACEHOLDER_AUDIO_FILE"
     },
-    "_meta": { "title": "Load Audio (track to split)" }
+    "_meta": { "title": "Load Audio" }
   },
   "2": {
-    "class_type": "Demucs_Loader",
+    "class_type": "AudioSeparateDemucs",
     "inputs": {
-      "d_model": "htdemucs",
-      "overlap": 0.25,
+      "input_sound": ["1", 0],
+      "model": "⬇️  Hybrid Transformer 6 sources",
       "shifts": 1,
-      "split": true
+      "overlap": 0.25,
+      "custom_segment": false,
+      "segment": 44,
+      "target_device": "cuda"
     },
-    "_meta": { "title": "Demucs Loader" }
-  },
-  "3": {
-    "class_type": "Demucs_Sampler",
-    "inputs": {
-      "model": ["2", 0],
-      "audio": ["1", 0],
-      "ext": "mp3",
-      "bits_per_sample": 16,
-      "as_float": "float32",
-      "clip_mode": "rescale",
-      "mp3_bitrate": 320,
-      "audio_save": false,
-      "preset": 2
-    },
-    "_meta": { "title": "Demucs Sampler" }
+    "_meta": { "title": "Demucs 6 sources" }
   },
   "4": {
     "class_type": "SaveAudioMP3",
     "inputs": {
-      "audio": ["3", 4],
+      "audio": ["2", 0],
       "filename_prefix": "PLACEHOLDER_PREFIX_vocals",
       "quality": "V0"
     },
@@ -43,28 +31,46 @@
   "5": {
     "class_type": "SaveAudioMP3",
     "inputs": {
-      "audio": ["3", 1],
-      "filename_prefix": "PLACEHOLDER_PREFIX_bass",
-      "quality": "V0"
-    },
-    "_meta": { "title": "Save Bass" }
-  },
-  "6": {
-    "class_type": "SaveAudioMP3",
-    "inputs": {
-      "audio": ["3", 2],
+      "audio": ["2", 1],
       "filename_prefix": "PLACEHOLDER_PREFIX_drums",
       "quality": "V0"
     },
     "_meta": { "title": "Save Drums" }
   },
+  "6": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": ["2", 2],
+      "filename_prefix": "PLACEHOLDER_PREFIX_bass",
+      "quality": "V0"
+    },
+    "_meta": { "title": "Save Bass" }
+  },
   "7": {
     "class_type": "SaveAudioMP3",
     "inputs": {
-      "audio": ["3", 3],
+      "audio": ["2", 3],
       "filename_prefix": "PLACEHOLDER_PREFIX_other",
       "quality": "V0"
     },
-    "_meta": { "title": "Save Other (instrumental)" }
+    "_meta": { "title": "Save Other" }
+  },
+  "8": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": ["2", 4],
+      "filename_prefix": "PLACEHOLDER_PREFIX_guitar",
+      "quality": "V0"
+    },
+    "_meta": { "title": "Save Guitar" }
+  },
+  "9": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": ["2", 5],
+      "filename_prefix": "PLACEHOLDER_PREFIX_piano",
+      "quality": "V0"
+    },
+    "_meta": { "title": "Save Piano" }
   }
 }

@@ -74,7 +74,7 @@ export const POST = handler(async (req, ctx) => {
   const prefix = `u${user.id}_t${row.id}${slug ? `_${slug}` : ""}_stems_`;
   let files = [];
   try { files = fs.readdirSync(OUTPUT_DIR); } catch {}
-  for (const name of ["vocals", "bass", "drums", "other"]) {
+  for (const name of ["vocals", "drums", "bass", "other", "guitar", "piano"]) {
     const exists = files.some((f) => f.startsWith(`${prefix}${name}_`) && f.endsWith(".mp3"));
     if (exists) stems[name] = `/api/stems/${row.id}/${name}`;
   }

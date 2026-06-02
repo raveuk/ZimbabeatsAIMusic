@@ -6,7 +6,7 @@ import { titleSlug } from "../../../../../lib/files.js";
 
 const COMFYUI_ROOT = process.env.COMFYUI_ROOT || "/home/raveuk/comfy/ComfyUI";
 const OUTPUT_DIR = path.join(COMFYUI_ROOT, "output", "music_app");
-const ALLOWED_STEMS = new Set(["vocals", "bass", "drums", "other"]);
+const ALLOWED_STEMS = new Set(["vocals", "drums", "bass", "other", "guitar", "piano"]);
 
 // Stream a single stem mp3 to the client. Owner-only access; same ?token=…
 // query-param fallback the other media endpoints use so <audio>/<a download>

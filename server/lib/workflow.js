@@ -153,11 +153,17 @@ function clamp(n, lo, hi) {
 // ---------------------------------------------------------------------------
 const STEMS_TEMPLATE = loadTemplate("workflow.stems.api.json");
 const STEMS_LOAD_NODE = "1";       // LoadAudio — input audio filename in ComfyUI's input/ folder
-const STEMS_SAVE_NODES = {         // node id -> stem name (matches the filename suffix)
+// Save-node id -> stem name. Order must match the workflow JSON's `audio`
+// wiring; AudioSeparateDemucs (node 2) emits in this order:
+//   slot 0 = vocals, 1 = drums, 2 = bass, 3 = other, 4 = guitar, 5 = piano
+// (the 6-source model splits "other" into guitar + piano vs the 4-stem model)
+const STEMS_SAVE_NODES = {
   "4": "vocals",
-  "5": "bass",
-  "6": "drums",
+  "5": "drums",
+  "6": "bass",
   "7": "other",
+  "8": "guitar",
+  "9": "piano",
 };
 export function stemsAvailable() { return !!STEMS_TEMPLATE; }
 

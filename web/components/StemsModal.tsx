@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Play, Pause, Download, Loader2, Mic, Drum, Music2, Speaker } from 'lucide-react';
+import { X, Play, Pause, Download, Loader2, Mic, Drum, Music2, Speaker, Guitar, Piano } from 'lucide-react';
 import { songsApi } from '../services/api';
 
 interface StemsModalProps {
@@ -8,13 +8,19 @@ interface StemsModalProps {
   onClose: () => void;
 }
 
-type StemMap = Partial<Record<'vocals' | 'bass' | 'drums' | 'other', string>>;
+type StemKey = 'vocals' | 'drums' | 'bass' | 'other' | 'guitar' | 'piano';
+type StemMap = Partial<Record<StemKey, string>>;
 
-const STEM_META: Array<{ key: keyof StemMap; label: string; icon: React.ReactNode; color: string }> = [
+// 6-stem layout from htdemucs_6s. The 4-stem model never produces guitar /
+// piano files — those rows just render as "unavailable" on tracks split
+// with the smaller model.
+const STEM_META: Array<{ key: StemKey; label: string; icon: React.ReactNode; color: string }> = [
   { key: 'vocals', label: 'Vocals',          icon: <Mic     size={16} />, color: 'text-pink-400' },
-  { key: 'bass',   label: 'Bass',            icon: <Speaker size={16} />, color: 'text-amber-400' },
   { key: 'drums',  label: 'Drums',           icon: <Drum    size={16} />, color: 'text-cyan-400' },
+  { key: 'bass',   label: 'Bass',            icon: <Speaker size={16} />, color: 'text-amber-400' },
   { key: 'other',  label: 'Other (melodic)', icon: <Music2  size={16} />, color: 'text-violet-400' },
+  { key: 'guitar', label: 'Guitar',          icon: <Guitar  size={16} />, color: 'text-emerald-400' },
+  { key: 'piano',  label: 'Piano',           icon: <Piano   size={16} />, color: 'text-sky-400' },
 ];
 
 // Modal that runs Demucs on a finished track and renders each stem inline
