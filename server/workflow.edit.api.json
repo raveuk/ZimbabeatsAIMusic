@@ -1,0 +1,41 @@
+{
+  "1": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "PLACEHOLDER.mp3"
+    },
+    "_meta": { "title": "Source audio" }
+  },
+  "2": {
+    "class_type": "AceStepGenerate",
+    "inputs": {
+      "prompt": "",
+      "lyrics": "",
+      "task_type": "lego",
+      "audio_duration": 60.0,
+      "num_inference_steps": 30,
+      "guidance_scale": 7.0,
+      "shift": 3.0,
+      "seed": 0,
+      "cfg_interval_start": 0.0,
+      "cfg_interval_end": 1.0,
+      "vocal_language": "en",
+      "src_audio": ["1", 0],
+      "repainting_start": 0.0,
+      "repainting_end": 0.0,
+      "track_name": "vocals",
+      "dtype": "bfloat16",
+      "device": "auto"
+    },
+    "_meta": { "title": "ACE-Step Lego (re-render vocals with new lyrics)" }
+  },
+  "3": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": ["2", 0],
+      "filename_prefix": "music_app/edit",
+      "quality": "V0"
+    },
+    "_meta": { "title": "Save Edited MP3" }
+  }
+}

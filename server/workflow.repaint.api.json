@@ -1,0 +1,40 @@
+{
+  "1": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "PLACEHOLDER.mp3"
+    },
+    "_meta": { "title": "Source audio" }
+  },
+  "2": {
+    "class_type": "AceStepGenerate",
+    "inputs": {
+      "prompt": "",
+      "lyrics": "",
+      "task_type": "repaint",
+      "audio_duration": 60.0,
+      "num_inference_steps": 30,
+      "guidance_scale": 7.0,
+      "shift": 3.0,
+      "seed": 0,
+      "cfg_interval_start": 0.0,
+      "cfg_interval_end": 1.0,
+      "vocal_language": "en",
+      "src_audio": ["1", 0],
+      "repainting_start": 0.0,
+      "repainting_end": 0.0,
+      "dtype": "bfloat16",
+      "device": "auto"
+    },
+    "_meta": { "title": "ACE-Step Repaint" }
+  },
+  "3": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": ["2", 0],
+      "filename_prefix": "music_app/repaint",
+      "quality": "V0"
+    },
+    "_meta": { "title": "Save Repainted MP3" }
+  }
+}

@@ -1,0 +1,273 @@
+{
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 31,
+      "steps": 30,
+      "cfg": 4,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "beta",
+      "denoise": 1,
+      "model": [
+        "78",
+        0
+      ],
+      "positive": [
+        "94",
+        0
+      ],
+      "negative": [
+        "47",
+        0
+      ],
+      "latent_image": [
+        "98",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "18": {
+    "class_type": "VAEDecodeAudio",
+    "inputs": {
+      "samples": [
+        "3",
+        0
+      ],
+      "vae": [
+        "106",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "VAEDecodeAudio"
+    }
+  },
+  "47": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "94",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "78": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "104",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "94": {
+    "class_type": "TextEncodeAceStepAudio1.5",
+    "inputs": {
+      "tags": "Modern R&B, warm and heartfelt, radio-ready glow. Crisp electronic\ndrums, airy synth pads, rolling bassline, tight vocal stacks and\nharmonies. Tender verses building to a full, soulful chorus. Clean\nproduction, smooth male/female lead vocal, 75 BPM, key of A major.",
+      "lyrics": "\"Bright Young Boy\"\nWritten for Kayvan\n(Verse 1)\nYear Six and the world's wide open,\nEvery morning's a brand-new song.\nThere's a fire in the way you're hopin',\nAnd a light that's been there all along.\n(Pre-Chorus)\nYou chase the dogs around the yard,\nHoney barks and Lily runs \u2014\nYou tease 'em, but you love 'em hard,\nThe truest heart beneath the fun.\n(Chorus)\nOh, bright young boy, you shine so true,\nThe whole world's lucky to be near you.\nWith every laugh and every joy,\nYou light it up \u2014 bright young boy.\n(Verse 2)\nYour toys are little kingdoms,\nAnd you rule them like a king.\nBut the love that lives inside you\nIs the most important thing.\n(Pre-Chorus)\nFor Mum and Dad who hold you near,\nFor your sister by your side \u2014\nYou give 'em more than words can say,\nA love you'll never need to hide.\n(Chorus)\nOh, bright young boy, you shine so true,\nThe whole world's lucky to be near you.\nWith every laugh and every joy,\nYou light it up \u2014 bright young boy.\n(Bridge)\nAnd Honey and Lily, they know it too \u2014\nThere's nobody else who loves like you.\nSo tease 'em, chase 'em, hold 'em tight,\nYou're their favourite part of every night.\n(Final Chorus)\nOh, bright young boy, keep shining on,\nThe kindest soul we've ever known.\nThrough every year and every joy,\nKeep lighting up \u2014 bright young boy.",
+      "seed": 31,
+      "bpm": 190,
+      "duration": 120,
+      "timesignature": "4",
+      "language": "en",
+      "keyscale": "E minor",
+      "generate_audio_codes": true,
+      "cfg_scale": 2,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "top_k": 0,
+      "min_p": 0,
+      "clip": [
+        "105",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "TextEncodeAceStepAudio1.5"
+    }
+  },
+  "98": {
+    "class_type": "EmptyAceStep1.5LatentAudio",
+    "inputs": {
+      "seconds": 120,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "EmptyAceStep1.5LatentAudio"
+    }
+  },
+  "104": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "acestep_v1.5_xl_sft_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "UNETLoader"
+    }
+  },
+  "105": {
+    "class_type": "DualCLIPLoader",
+    "inputs": {
+      "clip_name1": "qwen_0.6b_ace15.safetensors",
+      "clip_name2": "qwen_4b_ace15.safetensors",
+      "type": "ace",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "DualCLIPLoader"
+    }
+  },
+  "106": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ace_1.5_vae.safetensors"
+    },
+    "_meta": {
+      "title": "VAELoader"
+    }
+  },
+  "107": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "filename_prefix": "audio/ComfyUI",
+      "quality": "320k",
+      "audio": [
+        "207",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "SaveAudioMP3"
+    }
+  },
+  "200": {
+    "class_type": "AudioSeparateDemucs",
+    "inputs": {
+      "input_sound": [
+        "18",
+        0
+      ],
+      "model": "\u2b07\ufe0f  Hybrid Transformer 6 sources",
+      "shifts": 1,
+      "overlap": 0.25,
+      "custom_segment": false,
+      "segment": 10,
+      "target_device": "cuda"
+    },
+    "_meta": {
+      "title": "Demucs (clone pre-split)"
+    }
+  },
+  "203": {
+    "class_type": "LoadRVCModelNode",
+    "inputs": {
+      "model": "Claire.pth",
+      "index_mode": "auto",
+      "index_file": "",
+      "auto_download": true
+    },
+    "_meta": {
+      "title": "RVC voice model"
+    }
+  },
+  "204": {
+    "class_type": "RVCEngineNode",
+    "inputs": {
+      "pitch": 0,
+      "index_ratio": 0.75,
+      "consonant_protection": 0.25,
+      "volume_envelope": 0.25,
+      "hubert_model": "auto: Automatically select best available model",
+      "output_sample_rate": 0,
+      "enable_custom_chunking": false,
+      "device": "auto"
+    },
+    "_meta": {
+      "title": "RVC engine"
+    }
+  },
+  "205": {
+    "class_type": "UnifiedVoiceChangerNode",
+    "inputs": {
+      "TTS_engine": [
+        "204",
+        0
+      ],
+      "source_audio": [
+        "200",
+        0
+      ],
+      "narrator_target": [
+        "203",
+        0
+      ],
+      "refinement_passes": 1,
+      "max_chunk_duration": 30,
+      "chunk_method": "smart"
+    },
+    "_meta": {
+      "title": "RVC voice changer"
+    }
+  },
+  "206": {
+    "class_type": "MergeAudioNode",
+    "inputs": {
+      "audio1": [
+        "205",
+        0
+      ],
+      "audio2": [
+        "200",
+        1
+      ],
+      "merge_algorithm": "sum",
+      "audio3": [
+        "200",
+        2
+      ],
+      "audio4": [
+        "200",
+        3
+      ],
+      "sample_rate": "auto",
+      "normalize": true
+    },
+    "_meta": {
+      "title": "Mix vocals + drums/bass/other"
+    }
+  },
+  "207": {
+    "class_type": "MergeAudioNode",
+    "inputs": {
+      "audio1": [
+        "206",
+        0
+      ],
+      "audio2": [
+        "200",
+        4
+      ],
+      "merge_algorithm": "sum",
+      "audio3": [
+        "200",
+        5
+      ],
+      "sample_rate": "auto",
+      "normalize": true
+    },
+    "_meta": {
+      "title": "Final remix (with guitar/piano)"
+    }
+  }
+}

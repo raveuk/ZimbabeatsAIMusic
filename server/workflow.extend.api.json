@@ -1,0 +1,58 @@
+{
+  "1": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "PLACEHOLDER.mp3"
+    },
+    "_meta": { "title": "Source audio" }
+  },
+  "2": {
+    "class_type": "EmptyAudio",
+    "inputs": {
+      "duration": 30.0,
+      "sample_rate": 48000,
+      "channels": 2
+    },
+    "_meta": { "title": "Silent tail (placeholder for extension)" }
+  },
+  "3": {
+    "class_type": "AudioConcat",
+    "inputs": {
+      "audio1": ["1", 0],
+      "audio2": ["2", 0],
+      "direction": "after"
+    },
+    "_meta": { "title": "Source + silence" }
+  },
+  "4": {
+    "class_type": "AceStepGenerate",
+    "inputs": {
+      "prompt": "",
+      "lyrics": "",
+      "task_type": "repaint",
+      "audio_duration": 60.0,
+      "num_inference_steps": 30,
+      "guidance_scale": 7.0,
+      "shift": 3.0,
+      "seed": 0,
+      "cfg_interval_start": 0.0,
+      "cfg_interval_end": 1.0,
+      "vocal_language": "en",
+      "src_audio": ["3", 0],
+      "repainting_start": 30.0,
+      "repainting_end": -1.0,
+      "dtype": "bfloat16",
+      "device": "auto"
+    },
+    "_meta": { "title": "ACE-Step Extend (repaint past source end)" }
+  },
+  "5": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": ["4", 0],
+      "filename_prefix": "music_app/extend",
+      "quality": "V0"
+    },
+    "_meta": { "title": "Save Extended MP3" }
+  }
+}

@@ -71,3 +71,24 @@ if (!userCols.includes("disabled")) db.exec("ALTER TABLE users ADD COLUMN disabl
 // Per-user lifetime track quota. NULL = unlimited (default). When set,
 // /api/generate refuses once they reach that many existing tracks.
 if (!userCols.includes("track_quota")) db.exec("ALTER TABLE users ADD COLUMN track_quota INTEGER");
+
+// Uploads table — staged audio files in ComfyUI/input/ that back the
+// Transform tasks (Transcribe, Cover, Repaint, Extend, Edit). Files are
+// physically copied into ComfyUI's input/ folder and the row keeps the
+// link so we can clean up after 24h and authorize access by user_id.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS uploads (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    filename      TEXT NOT NULL,
+    original_name TEXT,
+    mime          TEXT,
+    size_bytes    INTEGER NOT NULL,
+    source        TEXT NOT NULL DEFAULT 'upload',
+    track_id      INTEGER REFERENCES tracks(id) ON DELETE SET NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+// Add lrc_path so Phase 2 can cache transcribed karaoke output per track.
+if (!cols.includes("lrc_path")) db.exec("ALTER TABLE tracks ADD COLUMN lrc_path TEXT");

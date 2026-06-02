@@ -17,7 +17,14 @@ const ALLOWED = new Set([
   "http://localhost:8082",
   "http://localhost:19006",
 ]);
-const ALLOWED_PATTERNS = [/^https:\/\/[a-z0-9-]+\.pages\.dev$/i];
+const ALLOWED_PATTERNS = [
+  /^https:\/\/[a-z0-9-]+\.pages\.dev$/i,
+  // Any localhost port — Vite picks whatever's free (3000, 3001, 5173, …),
+  // and pinning to specific ports broke Google sign-in when 3000 was already
+  // occupied and Vite landed on 3001.
+  /^http:\/\/localhost(:\d+)?$/i,
+  /^http:\/\/127\.0\.0\.1(:\d+)?$/i,
+];
 
 function isAllowedOrigin(origin) {
   if (!origin) return false;

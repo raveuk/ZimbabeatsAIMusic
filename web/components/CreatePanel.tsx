@@ -3,7 +3,8 @@ import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash,
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { generateApi, lyricsApi, modelsApi, API_BASE, ConfiguredModel } from '../services/api';
+import { generateApi, lyricsApi, modelsApi, transcribeApi, API_BASE, ConfiguredModel, StagedUpload } from '../services/api';
+import SourceAudioPicker from './SourceAudioPicker';
 import { MAIN_STYLES } from '../data/genres';
 import { EditableSlider } from './EditableSlider';
 
@@ -159,6 +160,60 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [instrumental, setInstrumental] = useState(false);
   const [vocalLanguage, setVocalLanguage] = useState('en');
   const [vocalGender, setVocalGender] = useState<'male' | 'female' | 'both' | ''>('');
+  // Optional voice clone — id is the .pth filename ("Claire.pth"). Empty string
+  // means "no cloning, use the model's native voice". Hydrated from /api/models
+  // — when the backend doesn't have the RVC clone workflow wired, the list is
+  // empty and the picker is hidden entirely.
+  const [voiceModel, setVoiceModel] = useState<string>(() => localStorage.getItem('ace-voiceModel') || '');
+  const [voiceOptions, setVoiceOptions] = useState<ConfiguredModel[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    modelsApi.list().then(({ voices }) => {
+      if (cancelled) return;
+      setVoiceOptions(voices || []);
+      // Drop a saved pick if it's no longer available on the backend.
+      setVoiceModel((prev) => (prev && (voices || []).some((v) => v.id === prev)) ? prev : '');
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => { localStorage.setItem('ace-voiceModel', voiceModel || ''); }, [voiceModel]);
+
+  // Transcribe state — Phase 1 of Transform panel wiring. `transcribePicker`
+  // controls the SourceAudioPicker modal; `transcribing` shows a spinner on
+  // the button. `transcribeSegments` keeps the word-level timing data around
+  // so Phase 2 (LRC export) can reuse it without re-running ASR.
+  const [transcribePickerOpen, setTranscribePickerOpen] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcribeError, setTranscribeError] = useState<string | null>(null);
+  const [transcribeSegments, setTranscribeSegments] = useState<any | null>(null);
+
+  // Cover state — Phase 4. When taskType='cover', the user picks a source
+  // track via the picker and we send {uploadId, taskType, audioCoverStrength}
+  // in the generate body. The backend routes through buildCoverAudioGraph.
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [coverUploadId, setCoverUploadId] = useState<number | null>(null);
+  const [coverSourceTitle, setCoverSourceTitle] = useState<string | null>(null);
+
+  // Extend state — Phase 5. When taskType='extend', `duration` becomes the
+  // tail length (seconds to add past the source). The backend probes the
+  // source duration via ffprobe before building the graph.
+  const [extendPickerOpen, setExtendPickerOpen] = useState(false);
+  const [extendUploadId, setExtendUploadId] = useState<number | null>(null);
+  const [extendSourceTitle, setExtendSourceTitle] = useState<string | null>(null);
+
+  // Repaint state — Phase 6. Source picker shows when taskType='repaint';
+  // the existing Transform-panel `repaintingStart`/`repaintingEnd` numeric
+  // inputs flow through the request unchanged.
+  const [repaintPickerOpen, setRepaintPickerOpen] = useState(false);
+  const [repaintUploadId, setRepaintUploadId] = useState<number | null>(null);
+  const [repaintSourceTitle, setRepaintSourceTitle] = useState<string | null>(null);
+
+  // Edit state — Phase 7. taskType='edit' uses ACE-Step's `lego` task with
+  // track_name="vocals" — keeps the audio context (instrumental + melody)
+  // and regenerates just the vocals from new lyrics in the Lyrics field.
+  const [editPickerOpen, setEditPickerOpen] = useState(false);
+  const [editUploadId, setEditUploadId] = useState<number | null>(null);
+  const [editSourceTitle, setEditSourceTitle] = useState<string | null>(null);
 
   // Music Parameters
   const [bpm, setBpm] = useState(0);
@@ -228,8 +283,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // LM Parameters (under Expert)
   const [showLmParams, setShowLmParams] = useState(false);
-  const [lmTemperature, setLmTemperature] = useState(0.8);
-  const [lmCfgScale, setLmCfgScale] = useState(2.2);
+  // Loosened from 0.8 → 0.95 to reduce the auto-tune feel: higher temperature
+  // = more variation in how the LM renders each phoneme, less stereotyped pop
+  // pronunciation. Combined with the lower diffusion CFG (workflow.api.json
+  // node 3 cfg=4) and lmCfgScale=1.7, this is the auto-tune mitigation set.
+  const [lmTemperature, setLmTemperature] = useState(0.95);
+  const [lmCfgScale, setLmCfgScale] = useState(1.7);
   const [lmTopK, setLmTopK] = useState(0);
   const [lmTopP, setLmTopP] = useState(0.92);
   // Default empty so an unset state never gets sent as "the user wants to
@@ -1093,6 +1152,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         ditModel: selectedModel,
         instrumental,
         vocalLanguage,
+        voiceModel: voiceModel || undefined,
         bpm,
         keyScale,
         timeSignature,
@@ -1125,6 +1185,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         instruction,
         audioCoverStrength,
         taskType,
+        uploadId:
+          taskType === 'cover'   ? coverUploadId   :
+          taskType === 'extend'  ? extendUploadId  :
+          taskType === 'repaint' ? repaintUploadId :
+          taskType === 'edit'    ? editUploadId    :
+          undefined,
         useAdg,
         cfgIntervalStart,
         cfgIntervalEnd,
@@ -1430,8 +1496,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <button
                     type="button"
                     onClick={() => setVocalGender(vocalGender === 'both' ? '' : 'both')}
-                    title="Male + female duet"
-                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'both' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                    disabled={!!voiceModel}
+                    title={voiceModel ? "Voice clone is on — duets are not supported (Demucs can't split a duet into two voices)" : 'Male + female duet'}
+                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'both' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'} ${voiceModel ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     Both
                   </button>
@@ -1444,6 +1511,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   </button>
                 </div>
               </div>
+              {voiceOptions.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider px-1">
+                    Voice Clone
+                  </label>
+                  <select
+                    value={voiceModel}
+                    onChange={(e) => setVoiceModel(e.target.value)}
+                    disabled={vocalGender === 'both'}
+                    className={`w-full px-2 py-2 rounded-lg text-xs bg-white dark:bg-suno-card border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-200 ${vocalGender === 'both' ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    title={vocalGender === 'both' ? 'Voice clone is unavailable for duets — pick Male or Female to enable' : 'Replace the generated vocal with a cloned voice (runs after generation)'}
+                  >
+                    <option value="">{t('off') || 'Off (original AI voice)'}</option>
+                    {voiceOptions.map((v) => (
+                      <option key={v.id} value={v.id}>{v.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Quick Settings (Simple Mode) */}
@@ -1915,8 +2001,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <button
                     type="button"
                     onClick={() => setVocalGender(vocalGender === 'both' ? '' : 'both')}
-                    title="Male + female duet"
-                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'both' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'}`}
+                    disabled={!!voiceModel}
+                    title={voiceModel ? "Voice clone is on — duets are not supported (Demucs can't split a duet into two voices)" : 'Male + female duet'}
+                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${vocalGender === 'both' ? 'bg-pink-600 text-white border-pink-600' : 'border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'} ${voiceModel ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     Both
                   </button>
@@ -1929,6 +2016,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   </button>
                 </div>
               </div>
+              {voiceOptions.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider px-1">
+                    Voice Clone
+                  </label>
+                  <select
+                    value={voiceModel}
+                    onChange={(e) => setVoiceModel(e.target.value)}
+                    disabled={vocalGender === 'both'}
+                    className={`w-full px-2 py-2 rounded-lg text-xs bg-white dark:bg-suno-card border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-200 ${vocalGender === 'both' ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    title={vocalGender === 'both' ? 'Voice clone is unavailable for duets — pick Male or Female to enable' : 'Replace the generated vocal with a cloned voice (runs after generation)'}
+                  >
+                    <option value="">Off (original AI voice)</option>
+                    {voiceOptions.map((v) => (
+                      <option key={v.id} value={v.id}>{v.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -2391,16 +2497,34 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    // Transcribe audio codes to metadata — requires Gradio lambda (not exposed as API)
-                    console.log('Transcribe: requires audio codes. Use Gradio UI for this feature.');
-                  }}
-                  disabled={!audioCodes.trim()}
-                  title="Transcribe audio codes to metadata (requires audio codes)"
-                  className="px-2 py-1 rounded text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  onClick={() => { setTranscribeError(null); setTranscribePickerOpen(true); }}
+                  disabled={transcribing}
+                  title="Extract lyrics from an audio file (uses Granite ASR — first run downloads ~6GB model)"
+                  className="px-2 py-1 rounded text-[10px] font-medium bg-pink-600 text-white hover:bg-pink-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  Transcribe
+                  {transcribing ? 'Transcribing…' : 'Transcribe'}
                 </button>
+              </div>
+              {transcribeError && (
+                <div className="text-[11px] text-red-600 dark:text-red-400 mt-1">{transcribeError}</div>
+              )}
+              <SourceAudioPicker
+                open={transcribePickerOpen}
+                onClose={() => setTranscribePickerOpen(false)}
+                title="Transcribe lyrics from a track"
+                onPick={async (staged: StagedUpload) => {
+                  setTranscribing(true); setTranscribeError(null);
+                  try {
+                    const { text, segments } = await transcribeApi.run(staged.uploadId);
+                    setLyrics(text || '');
+                    setTranscribeSegments(segments);
+                  } catch (e: any) {
+                    setTranscribeError(String(e?.message || e));
+                  } finally {
+                    setTranscribing(false);
+                  }
+                }}
+              />
               </div>
             </div>
 
@@ -2415,7 +2539,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <option value="text2music">{t('textToMusic')}</option>
                   <option value="audio2audio">{t('audio2audio')}</option>
                   <option value="cover">{t('coverTask')}</option>
+                  <option value="extend">Extend (continue clip)</option>
                   <option value="repaint">{t('repaintTask')}</option>
+                  <option value="edit">Edit (new lyrics, same melody)</option>
                 </select>
               </div>
               <div className="space-y-1.5">
@@ -2431,6 +2557,162 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 />
               </div>
             </div>
+
+            {/* Edit source picker — Phase 7. Lyrics field above gets re-sung
+                over the source's melody. Tip: hit Transcribe first to pull
+                in the source's existing lyrics, then edit and Generate. */}
+            {taskType === 'edit' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  Source audio (lyrics will be re-sung over this melody)
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditPickerOpen(true)}
+                    className="px-3 py-2 rounded-lg text-xs font-medium bg-pink-600 text-white hover:bg-pink-700 transition-colors"
+                  >
+                    {editUploadId ? 'Change source' : 'Pick source track'}
+                  </button>
+                  {editSourceTitle && (
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate flex-1">
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300">Source:</span> {editSourceTitle}
+                    </span>
+                  )}
+                </div>
+                {!editUploadId && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    Edit task requires a source track AND new lyrics. Tip: use Transcribe to pull in the existing lyrics, then edit them.
+                  </p>
+                )}
+                <SourceAudioPicker
+                  open={editPickerOpen}
+                  onClose={() => setEditPickerOpen(false)}
+                  title="Choose a track to re-lyric"
+                  onPick={(staged) => {
+                    setEditUploadId(staged.uploadId);
+                    setEditSourceTitle(staged.title || staged.originalName || `Upload #${staged.uploadId}`);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Repaint source picker — Phase 6. The Repainting Start/End
+                fields below already render unconditionally; the picker just
+                attaches the source. */}
+            {taskType === 'repaint' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  Source audio (track to repaint inside)
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRepaintPickerOpen(true)}
+                    className="px-3 py-2 rounded-lg text-xs font-medium bg-pink-600 text-white hover:bg-pink-700 transition-colors"
+                  >
+                    {repaintUploadId ? 'Change source' : 'Pick source track'}
+                  </button>
+                  {repaintSourceTitle && (
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate flex-1">
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300">Source:</span> {repaintSourceTitle}
+                    </span>
+                  )}
+                </div>
+                {!repaintUploadId && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    Repaint task requires a source. Pick one above and set Repainting Start/End below.
+                  </p>
+                )}
+                <SourceAudioPicker
+                  open={repaintPickerOpen}
+                  onClose={() => setRepaintPickerOpen(false)}
+                  title="Choose a track to repaint"
+                  onPick={(staged) => {
+                    setRepaintUploadId(staged.uploadId);
+                    setRepaintSourceTitle(staged.title || staged.originalName || `Upload #${staged.uploadId}`);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Extend source picker — Phase 5. Duration field doubles as
+                "extend by (seconds)" so we don't need a separate input. */}
+            {taskType === 'extend' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  Source audio to continue (Duration slider = seconds to add)
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExtendPickerOpen(true)}
+                    className="px-3 py-2 rounded-lg text-xs font-medium bg-pink-600 text-white hover:bg-pink-700 transition-colors"
+                  >
+                    {extendUploadId ? 'Change source' : 'Pick source track'}
+                  </button>
+                  {extendSourceTitle && (
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate flex-1">
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300">Source:</span> {extendSourceTitle}
+                    </span>
+                  )}
+                </div>
+                {!extendUploadId && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    Extend task requires a source. Pick one above before generating.
+                  </p>
+                )}
+                <SourceAudioPicker
+                  open={extendPickerOpen}
+                  onClose={() => setExtendPickerOpen(false)}
+                  title="Choose a clip to continue"
+                  onPick={(staged) => {
+                    setExtendUploadId(staged.uploadId);
+                    setExtendSourceTitle(staged.title || staged.originalName || `Upload #${staged.uploadId}`);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Cover source picker — only renders when the user picks the
+                cover task in the dropdown above. The picked uploadId rides
+                along in the generate body and routes the backend through
+                buildCoverAudioGraph (workflow.cover.audio.api.json). */}
+            {taskType === 'cover' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  Source audio (the track to re-style)
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCoverPickerOpen(true)}
+                    className="px-3 py-2 rounded-lg text-xs font-medium bg-pink-600 text-white hover:bg-pink-700 transition-colors"
+                  >
+                    {coverUploadId ? 'Change source' : 'Pick source track'}
+                  </button>
+                  {coverSourceTitle && (
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate flex-1">
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300">Source:</span> {coverSourceTitle}
+                    </span>
+                  )}
+                </div>
+                {!coverUploadId && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    Cover task requires a source. Pick one above before generating.
+                  </p>
+                )}
+                <SourceAudioPicker
+                  open={coverPickerOpen}
+                  onClose={() => setCoverPickerOpen(false)}
+                  title="Choose a source track to re-style"
+                  onPick={(staged) => {
+                    setCoverUploadId(staged.uploadId);
+                    setCoverSourceTitle(staged.title || staged.originalName || `Upload #${staged.uploadId}`);
+                  }}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -2575,11 +2857,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
             <div className="grid grid-cols-2 gap-3">
               <label
-                className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400"
-                title="Adaptive Dual Guidance: dynamically adjusts CFG for quality. Base model only; slower."
+                className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 opacity-60"
+                title="ADG/APG is always on in the diffusers pipeline (cover/extend/repaint/edit) whenever CFG is enabled — this checkbox has no effect. Left visible for parity with upstream UI."
               >
-                <input type="checkbox" checked={useAdg} onChange={() => setUseAdg(!useAdg)} />
-                {t('useAdg')}
+                <input type="checkbox" checked={useAdg} onChange={() => setUseAdg(!useAdg)} disabled />
+                {t('useAdg')} <span className="text-[10px] text-zinc-400">(always on)</span>
               </label>
               <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Allow the LM to run in larger batches for speed (more VRAM).">
                 <input type="checkbox" checked={allowLmBatch} onChange={() => setAllowLmBatch(!allowLmBatch)} />

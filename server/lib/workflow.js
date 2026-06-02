@@ -38,9 +38,12 @@ export const MODEL_FILES = {
 // behaves exactly as before. The ACE node ids (94/98/3) are assumed identical
 // in both templates; only the RVC + final-save nodes are template-specific.
 const CLONE_TEMPLATE = loadTemplate(process.env.RVC_CLONE_TEMPLATE || "workflow.clone.api.json");
-const RVC_NODE_ID = process.env.RVC_NODE_ID || null;       // id of the RVC inference node
-const RVC_MODEL_FIELD = process.env.RVC_MODEL_FIELD || "model"; // its input that selects the .pth
-const RVC_SAVE_NODE_ID = process.env.RVC_SAVE_NODE_ID || SAVE_NODE; // final SaveAudioMP3 in the clone graph
+// "203" is the LoadRVCModelNode in our generated workflow.clone.api.json; its
+// `model` input picks the .pth filename. Override via env when you re-export
+// the clone graph with different node ids.
+const RVC_NODE_ID = process.env.RVC_NODE_ID || "203";
+const RVC_MODEL_FIELD = process.env.RVC_MODEL_FIELD || "model";
+const RVC_SAVE_NODE_ID = process.env.RVC_SAVE_NODE_ID || SAVE_NODE;
 
 // True once the clone template exists and the RVC node id is configured.
 export function cloneAvailable() {
@@ -166,6 +169,241 @@ const STEMS_SAVE_NODES = {
   "9": "piano",
 };
 export function stemsAvailable() { return !!STEMS_TEMPLATE; }
+
+// ---------------------------------------------------------------------------
+// Transcribe (Granite ASR via TTS-Audio-Suite). LoadAudio → engine → ASR →
+// PreviewAny capture nodes. We use PreviewAny to push the STRING outputs into
+// the prompt's history.outputs map; without it, transient STRING values never
+// surface to the /history endpoint. First-run downloads the Granite model
+// (~6GB); subsequent runs cache and finish in seconds.
+// ---------------------------------------------------------------------------
+const TRANSCRIBE_TEMPLATE = loadTemplate("workflow.transcribe.api.json");
+const TRANSCRIBE_LOAD_NODE = "1";   // LoadAudio
+// ---------------------------------------------------------------------------
+// Audio cover (Phase 4) — task_type=cover via the AceStepGenerate custom node.
+// Source audio in → re-rendered in the user's chosen style. Lyrics are not
+// passed because the diffusers pipeline preserves the source vocals.
+// ---------------------------------------------------------------------------
+const COVER_AUDIO_TEMPLATE = loadTemplate("workflow.cover.audio.api.json");
+const COVER_AUDIO_LOAD_NODE = "1";      // LoadAudio — filename in ComfyUI's input/
+const COVER_AUDIO_GEN_NODE  = "2";      // AceStepGenerate
+const COVER_AUDIO_SAVE_NODE = "3";      // SaveAudioMP3
+export function coverAudioAvailable() { return !!COVER_AUDIO_TEMPLATE; }
+
+// ---------------------------------------------------------------------------
+// Extend (Phase 5) — continue an existing clip. Implemented as a repaint
+// over a source that's been padded with silence: the audio (and its latent)
+// gets extended to the target duration, then task_type=repaint regenerates
+// only the silent tail. Caller must measure `sourceDuration` first (via
+// ffprobe / track-row lookup) so we know where the splice is.
+// ---------------------------------------------------------------------------
+const EXTEND_TEMPLATE  = loadTemplate("workflow.extend.api.json");
+const EXTEND_LOAD_NODE = "1";       // LoadAudio
+const EXTEND_PAD_NODE  = "2";       // EmptyAudio (the silent tail)
+const EXTEND_GEN_NODE  = "4";       // AceStepGenerate
+const EXTEND_SAVE_NODE = "5";       // SaveAudioMP3
+export function extendAvailable() { return !!EXTEND_TEMPLATE; }
+
+export function buildExtendGraph(input) {
+  if (!EXTEND_TEMPLATE) return null;
+  if (!input.audioInputFile) throw new Error("extend graph requires audioInputFile");
+  const srcDur = Number(input.sourceDuration);
+  if (!Number.isFinite(srcDur) || srcDur <= 0) {
+    throw new Error("extend graph requires positive sourceDuration");
+  }
+  const extendBy = clamp(Number(input.extendBy) || 30, 5, 240);
+  const totalDur = srcDur + extendBy;
+
+  const g = structuredClone(EXTEND_TEMPLATE);
+  const seed =
+    Number.isInteger(input.seed) && input.seed >= 0
+      ? input.seed
+      : Math.floor(Math.random() * 2 ** 31);
+
+  g[EXTEND_LOAD_NODE].inputs.audio = String(input.audioInputFile);
+  g[EXTEND_PAD_NODE].inputs.duration = extendBy;
+
+  const gen = g[EXTEND_GEN_NODE].inputs;
+  gen.audio_duration   = totalDur;
+  gen.repainting_start = srcDur;       // splice point — start regenerating here
+  gen.repainting_end   = totalDur;     // …through the end of the padded latent
+  gen.seed = seed;
+  if (input.style != null)  gen.prompt = String(input.style);
+  if (input.lyrics != null) gen.lyrics = String(input.lyrics);
+  if (input.steps != null)         gen.num_inference_steps = clamp(Number(input.steps), 1, 100);
+  if (input.cfgScale != null)      gen.guidance_scale = clamp(Number(input.cfgScale), 0, 20);
+  if (input.shift != null)         gen.shift = clamp(Number(input.shift), 1, 7);
+  if (input.cfgIntervalStart != null) gen.cfg_interval_start = clamp(Number(input.cfgIntervalStart), 0, 1);
+  if (input.cfgIntervalEnd   != null) gen.cfg_interval_end   = clamp(Number(input.cfgIntervalEnd),   0, 1);
+  if (input.language != null)      gen.vocal_language = String(input.language);
+
+  const save = g[EXTEND_SAVE_NODE].inputs;
+  save.filename_prefix = input.filenamePrefix || "music_app/extend";
+  if (input.quality && MP3_QUALITIES.includes(input.quality)) save.quality = input.quality;
+
+  return { graph: g, seed, duration: totalDur };
+}
+
+// ---------------------------------------------------------------------------
+// Repaint (Phase 6) — regenerate a time window inside an existing clip. The
+// source latent is kept outside `[repainting_start, repainting_end]`; only
+// the slice between those timestamps is sampled fresh. audio_duration must
+// equal the source duration (probed via ffprobe in the route).
+// ---------------------------------------------------------------------------
+const REPAINT_TEMPLATE  = loadTemplate("workflow.repaint.api.json");
+const REPAINT_LOAD_NODE = "1";       // LoadAudio
+const REPAINT_GEN_NODE  = "2";       // AceStepGenerate
+const REPAINT_SAVE_NODE = "3";       // SaveAudioMP3
+export function repaintAvailable() { return !!REPAINT_TEMPLATE; }
+
+export function buildRepaintGraph(input) {
+  if (!REPAINT_TEMPLATE) return null;
+  if (!input.audioInputFile) throw new Error("repaint graph requires audioInputFile");
+  const srcDur = Number(input.sourceDuration);
+  if (!Number.isFinite(srcDur) || srcDur <= 0) {
+    throw new Error("repaint graph requires positive sourceDuration");
+  }
+  const start = Math.max(0, Number(input.repaintingStart) || 0);
+  let end = Number(input.repaintingEnd);
+  // -1 / 0 / missing → "to the end". Clamp end to source duration.
+  if (!Number.isFinite(end) || end <= 0 || end > srcDur) end = srcDur;
+  if (start >= end) {
+    throw new Error(`repaint window is empty: start=${start} end=${end} sourceDuration=${srcDur}`);
+  }
+
+  const g = structuredClone(REPAINT_TEMPLATE);
+  const seed =
+    Number.isInteger(input.seed) && input.seed >= 0
+      ? input.seed
+      : Math.floor(Math.random() * 2 ** 31);
+
+  g[REPAINT_LOAD_NODE].inputs.audio = String(input.audioInputFile);
+
+  const gen = g[REPAINT_GEN_NODE].inputs;
+  gen.audio_duration   = srcDur;
+  gen.repainting_start = start;
+  gen.repainting_end   = end;
+  gen.seed = seed;
+  if (input.style != null)  gen.prompt = String(input.style);
+  if (input.lyrics != null) gen.lyrics = String(input.lyrics);
+  if (input.steps != null)         gen.num_inference_steps = clamp(Number(input.steps), 1, 100);
+  if (input.cfgScale != null)      gen.guidance_scale = clamp(Number(input.cfgScale), 0, 20);
+  if (input.shift != null)         gen.shift = clamp(Number(input.shift), 1, 7);
+  if (input.cfgIntervalStart != null) gen.cfg_interval_start = clamp(Number(input.cfgIntervalStart), 0, 1);
+  if (input.cfgIntervalEnd   != null) gen.cfg_interval_end   = clamp(Number(input.cfgIntervalEnd),   0, 1);
+  if (input.language != null)      gen.vocal_language = String(input.language);
+
+  const save = g[REPAINT_SAVE_NODE].inputs;
+  save.filename_prefix = input.filenamePrefix || "music_app/repaint";
+  if (input.quality && MP3_QUALITIES.includes(input.quality)) save.quality = input.quality;
+
+  return { graph: g, seed, duration: srcDur };
+}
+
+// ---------------------------------------------------------------------------
+// Edit (Phase 7) — change the lyrics while preserving melody/arrangement. We
+// use ACE-Step's task_type=lego with track_name="vocals" so the pipeline keeps
+// the audio context (instrumental + structure) and regenerates just the named
+// track. Defaults to the full source window; caller can narrow with
+// repaintingStart/End if they only want to edit a verse.
+// ---------------------------------------------------------------------------
+const EDIT_TEMPLATE  = loadTemplate("workflow.edit.api.json");
+const EDIT_LOAD_NODE = "1";       // LoadAudio
+const EDIT_GEN_NODE  = "2";       // AceStepGenerate
+const EDIT_SAVE_NODE = "3";       // SaveAudioMP3
+export function editAvailable() { return !!EDIT_TEMPLATE; }
+
+export function buildEditGraph(input) {
+  if (!EDIT_TEMPLATE) return null;
+  if (!input.audioInputFile) throw new Error("edit graph requires audioInputFile");
+  if (!input.lyrics)         throw new Error("edit graph requires new lyrics");
+  const srcDur = Number(input.sourceDuration);
+  if (!Number.isFinite(srcDur) || srcDur <= 0) {
+    throw new Error("edit graph requires positive sourceDuration");
+  }
+  const start = Math.max(0, Number(input.repaintingStart) || 0);
+  let end = Number(input.repaintingEnd);
+  if (!Number.isFinite(end) || end <= 0 || end > srcDur) end = srcDur;
+  if (start >= end) {
+    throw new Error(`edit window is empty: start=${start} end=${end} sourceDuration=${srcDur}`);
+  }
+
+  const g = structuredClone(EDIT_TEMPLATE);
+  const seed =
+    Number.isInteger(input.seed) && input.seed >= 0
+      ? input.seed
+      : Math.floor(Math.random() * 2 ** 31);
+
+  g[EDIT_LOAD_NODE].inputs.audio = String(input.audioInputFile);
+
+  const gen = g[EDIT_GEN_NODE].inputs;
+  gen.lyrics           = String(input.lyrics);
+  gen.audio_duration   = srcDur;
+  gen.repainting_start = start;
+  gen.repainting_end   = end;
+  gen.seed = seed;
+  if (input.style != null)  gen.prompt = String(input.style);
+  if (input.trackName)      gen.track_name = String(input.trackName);
+  if (input.steps != null)         gen.num_inference_steps = clamp(Number(input.steps), 1, 100);
+  if (input.cfgScale != null)      gen.guidance_scale = clamp(Number(input.cfgScale), 0, 20);
+  if (input.shift != null)         gen.shift = clamp(Number(input.shift), 1, 7);
+  if (input.cfgIntervalStart != null) gen.cfg_interval_start = clamp(Number(input.cfgIntervalStart), 0, 1);
+  if (input.cfgIntervalEnd   != null) gen.cfg_interval_end   = clamp(Number(input.cfgIntervalEnd),   0, 1);
+  if (input.language != null)      gen.vocal_language = String(input.language);
+
+  const save = g[EDIT_SAVE_NODE].inputs;
+  save.filename_prefix = input.filenamePrefix || "music_app/edit";
+  if (input.quality && MP3_QUALITIES.includes(input.quality)) save.quality = input.quality;
+
+  return { graph: g, seed, duration: srcDur };
+}
+
+export function buildCoverAudioGraph(input) {
+  if (!COVER_AUDIO_TEMPLATE) return null;
+  if (!input.audioInputFile) throw new Error("cover graph requires audioInputFile");
+
+  const g = structuredClone(COVER_AUDIO_TEMPLATE);
+  const seed =
+    Number.isInteger(input.seed) && input.seed >= 0
+      ? input.seed
+      : Math.floor(Math.random() * 2 ** 31);
+
+  g[COVER_AUDIO_LOAD_NODE].inputs.audio = String(input.audioInputFile);
+
+  const gen = g[COVER_AUDIO_GEN_NODE].inputs;
+  if (input.style != null)         gen.prompt = String(input.style);
+  if (input.lyrics != null)        gen.lyrics = String(input.lyrics); // optional override
+  gen.seed = seed;
+  if (input.duration != null)      gen.audio_duration = clamp(Number(input.duration), 5, 240);
+  if (input.steps != null)         gen.num_inference_steps = clamp(Number(input.steps), 1, 100);
+  if (input.cfgScale != null)      gen.guidance_scale = clamp(Number(input.cfgScale), 0, 20);
+  if (input.shift != null)         gen.shift = clamp(Number(input.shift), 1, 7);
+  if (input.cfgIntervalStart != null) gen.cfg_interval_start = clamp(Number(input.cfgIntervalStart), 0, 1);
+  if (input.cfgIntervalEnd   != null) gen.cfg_interval_end   = clamp(Number(input.cfgIntervalEnd),   0, 1);
+  if (input.language != null)      gen.vocal_language = String(input.language);
+  if (input.audioCoverStrength != null) {
+    gen.audio_cover_strength = clamp(Number(input.audioCoverStrength), 0, 1);
+  }
+
+  const save = g[COVER_AUDIO_SAVE_NODE].inputs;
+  save.filename_prefix = input.filenamePrefix || "music_app/cover";
+  if (input.quality && MP3_QUALITIES.includes(input.quality)) save.quality = input.quality;
+
+  return { graph: g, seed };
+}
+
+export const TRANSCRIBE_TEXT_NODE   = "4"; // PreviewAny → ASR text
+export const TRANSCRIBE_TIMING_NODE = "5"; // PreviewAny → word timing JSON
+export const TRANSCRIBE_SRT_NODE    = "7"; // PreviewAny → SRT (timestamped lyrics, used by Phase 2 LRC)
+export function transcribeAvailable() { return !!TRANSCRIBE_TEMPLATE; }
+
+export function buildTranscribeGraph(input) {
+  if (!TRANSCRIBE_TEMPLATE) return null;
+  if (!input.audioInputFile) throw new Error("transcribe graph requires audioInputFile");
+  const g = structuredClone(TRANSCRIBE_TEMPLATE);
+  g[TRANSCRIBE_LOAD_NODE].inputs.audio = String(input.audioInputFile);
+  return { graph: g };
+}
 
 export function buildStemsGraph(input) {
   if (!STEMS_TEMPLATE) return null;

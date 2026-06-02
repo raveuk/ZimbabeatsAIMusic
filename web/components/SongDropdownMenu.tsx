@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Song } from '../types';
 import { useI18n } from '../context/I18nContext';
 import { StemsModal } from './StemsModal';
+import { lrcApi } from '../services/api';
 import {
     Video,
     Edit3,
@@ -9,6 +10,7 @@ import {
     Repeat,
     ListPlus,
     Download,
+    FileText,
     Trash2,
     Share2
 } from 'lucide-react';
@@ -81,6 +83,28 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
     const { t } = useI18n();
     const menuRef = useRef<HTMLDivElement>(null);
     const [stemsOpen, setStemsOpen] = useState(false);
+    const [lrcBusy, setLrcBusy] = useState(false);
+
+    // Download karaoke .lrc — first call kicks off Granite ASR on the server
+    // (~5–15s once warm; first call after a server restart pays the model
+    // download cost). Subsequent calls stream from the cached file.
+    const handleDownloadLrc = async () => {
+        if (lrcBusy) return;
+        setLrcBusy(true);
+        try {
+            const { blob, filename } = await lrcApi.download(song.id);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename; a.click();
+            URL.revokeObjectURL(url);
+            onClose();
+        } catch (e) {
+            console.error('LRC download failed:', e);
+            alert(`LRC download failed: ${(e as Error).message}`);
+        } finally {
+            setLrcBusy(false);
+        }
+    };
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -230,6 +254,12 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
                 icon={<Download size={14} />}
                 label={t('download')}
                 onClick={onDownload ? () => handleAction(onDownload) : handleDownload}
+            />
+            <MenuItem
+                icon={<FileText size={14} />}
+                label={lrcBusy ? 'Karaoke (.lrc) — generating…' : 'Karaoke (.lrc)'}
+                onClick={handleDownloadLrc}
+                disabled={lrcBusy}
             />
             <MenuItem
                 icon={<Share2 size={14} />}

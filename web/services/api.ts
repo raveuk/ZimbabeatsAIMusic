@@ -264,8 +264,12 @@ function withSignedToken(url: string | undefined): string | undefined {
 // cover-checkpoint pickers from this so the UI never drifts from reality.
 export interface ConfiguredModel { id: string; file: string; label: string; role?: string }
 export const modelsApi = {
-  list: async (): Promise<{ lmModels: ConfiguredModel[]; unetModels: ConfiguredModel[]; coverModels: ConfiguredModel[] }> =>
-    api('/api/models'),
+  list: async (): Promise<{
+    lmModels: ConfiguredModel[];
+    unetModels: ConfiguredModel[];
+    coverModels: ConfiguredModel[];
+    voices?: ConfiguredModel[];
+  }> => api('/api/models'),
 };
 
 // Standalone lyric-writer endpoint — used by the Create panel's "Write
@@ -440,6 +444,74 @@ export const songsApi = {
   deleteComment: async (_id: string, _token?: string): Promise<{ success: boolean }> => ({ success: true }),
 };
 
+// Transcribe API — runs the Granite ASR workflow on a staged upload, returns
+// the lyric text + word-level timing data (for Phase 2 LRC export). The
+// Transcribe button in the Transform panel hits this directly.
+export const transcribeApi = {
+  run: async (uploadId: number): Promise<{ text: string; segments: any | null; promptId: string }> =>
+    api('/api/transcribe', { method: 'POST', body: { uploadId } }),
+};
+
+// LRC API — produces a karaoke .lrc for any finished track in the user's
+// library. First call runs ASR (~5–15s on a 60s track once Granite is
+// warm); subsequent calls stream from disk. The browser handles the
+// download via a temporary blob URL since the route returns a file body
+// (not JSON).
+export const lrcApi = {
+  download: async (trackId: number | string): Promise<{ blob: Blob; filename: string }> => {
+    const tok = (await firebaseAuth.currentUser?.getIdToken()) ?? null;
+    const res = await fetch(`${API_BASE}/api/lrc/${encodeURIComponent(String(trackId))}`, {
+      headers: tok ? { Authorization: `Bearer ${tok}` } : undefined,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'LRC download failed' }));
+      throw new Error(`${res.status}: ${err.error || 'LRC download failed'}`);
+    }
+    // Pull the filename out of content-disposition if present.
+    const cd = res.headers.get('content-disposition') || '';
+    const m = cd.match(/filename="?([^"]+)"?/i);
+    const filename = (m?.[1] ?? `track_${trackId}.lrc`);
+    return { blob: await res.blob(), filename };
+  },
+};
+
+// Upload staging API — backs the SourceAudioPicker that the Transform-panel
+// features (Transcribe, Cover, Repaint, Extend, Edit) consume. Files are
+// staged into ComfyUI's input/ folder so any LoadAudio-fed workflow can
+// pick them up by basename.
+export interface StagedUpload {
+  uploadId: number;
+  filename: string;
+  originalName?: string | null;
+  trackId?: number;
+  title?: string | null;
+  sizeBytes?: number;
+}
+export const uploadsApi = {
+  // Multipart upload — bypasses api() because the helper hard-codes JSON
+  // content-type. We still attach the Firebase bearer token manually.
+  upload: async (file: File): Promise<StagedUpload> => {
+    const tok = (await firebaseAuth.currentUser?.getIdToken()) ?? null;
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`${API_BASE}/api/uploads`, {
+      method: 'POST',
+      headers: tok ? { Authorization: `Bearer ${tok}` } : undefined,
+      body: fd,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'upload failed' }));
+      throw new Error(`${res.status}: ${err.error || 'upload failed'}`);
+    }
+    return res.json();
+  },
+  // Copy a finished track from the user's library into ComfyUI's input/ as
+  // a staged upload — no download/re-upload round-trip needed.
+  fromTrack: async (trackId: number | string): Promise<StagedUpload> =>
+    api('/api/uploads/from-track', { method: 'POST', body: { trackId: Number(trackId) } }),
+  list: async (): Promise<{ uploads: StagedUpload[] }> => api('/api/uploads'),
+};
+
 interface Comment {
   id: string;
   song_id: string;
@@ -467,6 +539,11 @@ export interface GenerationParams {
   // Common
   instrumental: boolean;
   vocalLanguage?: string;
+  // Optional RVC voice clone — when set, the generated vocal is run through
+  // RVC after demucs split, then remixed with the instrumental. Filename of
+  // the .pth (e.g. "Claire.pth"). Backend ignores it if the clone workflow
+  // isn't wired.
+  voiceModel?: string | null;
 
   // Music Parameters
   duration?: number;
@@ -508,6 +585,8 @@ export interface GenerationParams {
   instruction?: string;
   audioCoverStrength?: number;
   taskType?: string;
+  // Cover/Repaint/Extend/Edit source upload id (from uploadsApi).
+  uploadId?: number | null;
   useAdg?: boolean;
   cfgIntervalStart?: number;
   cfgIntervalEnd?: number;
@@ -604,6 +683,18 @@ function toBackendBody(p: GenerationParams) {
     writeLyrics,
     theme: writeLyrics ? themeFallback : undefined,
     ditModel,
+    voiceModel: p.voiceModel || undefined,
+    // Phase 4+ task routing. Backend defaults to "text2music" when omitted.
+    taskType: p.taskType && p.taskType !== 'text2music' ? p.taskType : undefined,
+    uploadId: p.uploadId ?? undefined,
+    audioCoverStrength: typeof p.audioCoverStrength === 'number' ? p.audioCoverStrength : undefined,
+    repaintingStart: typeof p.repaintingStart === 'number' ? p.repaintingStart : undefined,
+    repaintingEnd:   typeof p.repaintingEnd   === 'number' ? p.repaintingEnd   : undefined,
+    cfgIntervalStart: typeof p.cfgIntervalStart === 'number' ? p.cfgIntervalStart : undefined,
+    cfgIntervalEnd:   typeof p.cfgIntervalEnd   === 'number' ? p.cfgIntervalEnd   : undefined,
+    trackName: p.trackName?.trim() || undefined,
+    completeTrackClasses: Array.isArray(p.completeTrackClasses) && p.completeTrackClasses.length
+      ? p.completeTrackClasses : undefined,
   };
 }
 

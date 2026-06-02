@@ -1,0 +1,63 @@
+{
+  "1": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "PLACEHOLDER.mp3"
+    },
+    "_meta": { "title": "LoadAudio" }
+  },
+  "2": {
+    "class_type": "Qwen3TTSEngineNode",
+    "inputs": {
+      "model_size": "0.6B",
+      "device": "auto",
+      "voice_preset": "None (Zero-shot / Custom)",
+      "language": "Auto",
+      "instruct": "",
+      "top_k": 50,
+      "top_p": 0.9,
+      "temperature": 0.7,
+      "repetition_penalty": 1.1,
+      "max_new_tokens": 2048,
+      "dtype": "bfloat16",
+      "attn_implementation": "sdpa",
+      "asr_use_forced_aligner": true
+    },
+    "_meta": { "title": "ASR Engine (Qwen3 0.6B, bf16 + aligner)" }
+  },
+  "3": {
+    "class_type": "UnifiedASRTranscribeNode",
+    "inputs": {
+      "engine": ["2", 0],
+      "audio": ["1", 0],
+      "language": "English",
+      "task": "transcribe",
+      "timestamps": "word",
+      "enable_asr_cache": true
+    },
+    "_meta": { "title": "ASR Transcribe (word timing, no aligner)" }
+  },
+  "4": {
+    "class_type": "PreviewAny",
+    "inputs": { "source": ["3", 0] },
+    "_meta": { "title": "Lyrics (text)" }
+  },
+  "5": {
+    "class_type": "PreviewAny",
+    "inputs": { "source": ["3", 1] },
+    "_meta": { "title": "Word timing (JSON)" }
+  },
+  "6": {
+    "class_type": "TextToSRTBuilderNode",
+    "inputs": {
+      "text": ["3", 0],
+      "asr_timing_data": ["3", 1]
+    },
+    "_meta": { "title": "SRT builder" }
+  },
+  "7": {
+    "class_type": "PreviewAny",
+    "inputs": { "source": ["6", 0] },
+    "_meta": { "title": "SRT (timestamped lyrics)" }
+  }
+}
