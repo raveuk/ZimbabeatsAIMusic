@@ -383,6 +383,25 @@ export const songsApi = {
   deleteSong: (id: string, _token?: string): Promise<{ success: boolean }> =>
     api(`/api/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
+  // Run Demucs htdemucs on the finished track. ~30–60s wall time on a 3090.
+  // Returns auth'd stem URLs (vocals/bass/drums/other) that the UI can hand
+  // straight to <audio> or download links.
+  extractStems: async (id: string): Promise<{ ok: boolean; stems: Record<string, string> }> => {
+    const r = await api<{ ok: boolean; promptId: string; stems: Record<string, string> }>(
+      `/api/jobs/${encodeURIComponent(id)}/stems`,
+      { method: 'POST' },
+    );
+    // Append the Firebase ID token so <audio src> / <a download> can fetch
+    // the auth'd /api/stems URLs without needing an Authorization header.
+    const tok = await firebaseAuth.currentUser?.getIdToken();
+    const signed: Record<string, string> = {};
+    for (const [name, rel] of Object.entries(r.stems || {})) {
+      const abs = `${API_BASE}${rel}`;
+      signed[name] = tok ? `${abs}?token=${encodeURIComponent(tok)}` : abs;
+    }
+    return { ok: r.ok, stems: signed };
+  },
+
   // Likes / play-count not modelled server-side; treat as no-ops.
   toggleLike:    async (_id: string, _token?: string): Promise<{ liked: boolean }> => ({ liked: false }),
   trackPlay:     async (_id: string, _token?: string | null): Promise<{ viewCount: number }> => ({ viewCount: 0 }),

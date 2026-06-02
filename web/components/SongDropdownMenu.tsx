@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Song } from '../types';
 import { useI18n } from '../context/I18nContext';
+import { songsApi } from '../services/api';
 import {
     Video,
     Edit3,
@@ -122,16 +123,27 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
         onClose();
     };
 
-    const handleExtractStems = () => {
-        if (!song.audioUrl) return;
-        const baseUrl = window.location.port === '3000'
-            ? `${window.location.protocol}//${window.location.hostname}:3001`
-            : window.location.origin;
-        const audioUrl = song.audioUrl.startsWith('http')
-            ? song.audioUrl
-            : `${baseUrl}${song.audioUrl}`;
-        window.open(`${baseUrl}/demucs-web/?audioUrl=${encodeURIComponent(audioUrl)}`, '_blank');
+    // Calls our backend /api/jobs/:id/stems (Demucs htdemucs). Demucs takes
+    // ~30–60s on a 3090, so we show a single browser prompt with the four
+    // signed stem URLs once it's done. Quick MVP — replace with a proper
+    // panel when we have a place for it in the song-detail sidebar.
+    const handleExtractStems = async () => {
+        if (!song.id) return;
         onClose();
+        try {
+            // Optimistic UX cue. Replace with a toast once we have a global
+            // toast handler reachable from this component.
+            console.log('[stems] starting Demucs on track', song.id);
+            const { stems } = await songsApi.extractStems(String(song.id));
+            const links = ['vocals', 'bass', 'drums', 'other']
+                .map((s) => stems[s] ? `${s}: ${stems[s]}` : `${s}: (missing)`).join('\n');
+            window.prompt('Stems ready — copy a link to download:', links);
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : 'Stem extraction failed';
+            console.error('[stems]', msg);
+            // eslint-disable-next-line no-alert
+            window.alert(`Stem extraction failed:\n${msg}`);
+        }
     };
 
     const handleDownload = async () => {

@@ -146,6 +146,34 @@ function clamp(n, lo, hi) {
 }
 
 // ---------------------------------------------------------------------------
+// Stem separation (Demucs htdemucs). On demand, after a track is done — we
+// copy the audio file into ComfyUI's input/ folder, run it through Demucs,
+// and save four stems (vocals, bass, drums, other) into output/music_app/
+// alongside the original. ~30–60s per track on the 3090.
+// ---------------------------------------------------------------------------
+const STEMS_TEMPLATE = loadTemplate("workflow.stems.api.json");
+const STEMS_LOAD_NODE = "1";       // LoadAudio — input audio filename in ComfyUI's input/ folder
+const STEMS_SAVE_NODES = {         // node id -> stem name (matches the filename suffix)
+  "4": "vocals",
+  "5": "bass",
+  "6": "drums",
+  "7": "other",
+};
+export function stemsAvailable() { return !!STEMS_TEMPLATE; }
+
+export function buildStemsGraph(input) {
+  if (!STEMS_TEMPLATE) return null;
+  const g = structuredClone(STEMS_TEMPLATE);
+  if (!input.audioInputFile) throw new Error("stems graph requires audioInputFile");
+  g[STEMS_LOAD_NODE].inputs.audio = String(input.audioInputFile);
+  const base = input.filenamePrefix || "music_app/stems";
+  for (const [nodeId, stem] of Object.entries(STEMS_SAVE_NODES)) {
+    if (g[nodeId]) g[nodeId].inputs.filename_prefix = `${base}_${stem}`;
+  }
+  return { graph: g, stems: Object.values(STEMS_SAVE_NODES) };
+}
+
+// ---------------------------------------------------------------------------
 // Cover art (SDXL). Submitted as a separate, much shorter ComfyUI prompt right
 // after the audio prompt — they run independently and the cover is done in
 // ~5–8s on the 3090, well before the audio finishes.

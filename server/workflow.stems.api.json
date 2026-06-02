@@ -1,0 +1,70 @@
+{
+  "1": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "PLACEHOLDER_AUDIO_FILE"
+    },
+    "_meta": { "title": "Load Audio (track to split)" }
+  },
+  "2": {
+    "class_type": "Demucs_Loader",
+    "inputs": {
+      "d_model": "htdemucs",
+      "overlap": 0.25,
+      "shifts": 1,
+      "split": true
+    },
+    "_meta": { "title": "Demucs Loader" }
+  },
+  "3": {
+    "class_type": "Demucs_Sampler",
+    "inputs": {
+      "model": ["2", 0],
+      "audio": ["1", 0],
+      "ext": "mp3",
+      "bits_per_sample": 16,
+      "as_float": "float32",
+      "clip_mode": "rescale",
+      "mp3_bitrate": 320,
+      "audio_save": false,
+      "preset": 2
+    },
+    "_meta": { "title": "Demucs Sampler" }
+  },
+  "4": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": ["3", 4],
+      "filename_prefix": "PLACEHOLDER_PREFIX_vocals",
+      "quality": "V0"
+    },
+    "_meta": { "title": "Save Vocals" }
+  },
+  "5": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": ["3", 1],
+      "filename_prefix": "PLACEHOLDER_PREFIX_bass",
+      "quality": "V0"
+    },
+    "_meta": { "title": "Save Bass" }
+  },
+  "6": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": ["3", 2],
+      "filename_prefix": "PLACEHOLDER_PREFIX_drums",
+      "quality": "V0"
+    },
+    "_meta": { "title": "Save Drums" }
+  },
+  "7": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": ["3", 3],
+      "filename_prefix": "PLACEHOLDER_PREFIX_other",
+      "quality": "V0"
+    },
+    "_meta": { "title": "Save Other (instrumental)" }
+  }
+}
