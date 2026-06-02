@@ -16,23 +16,24 @@ function slug(file) {
   return file.replace(/\.safetensors$/i, "").replace(/[^a-z0-9_]+/gi, "_");
 }
 
-// Human label — translates the technical filename into a brand-neutral name
-// the user sees in the picker. Hides "qwen", parameter counts, and quant
-// suffixes. Updated this table when adding new models so the UI stays clean.
+// Human label — translates the technical filename into a UI-facing string.
+// Format is "<size/spec> <qualitative>" (e.g. "4B Best") so users see both
+// the engine spec they might recognise AND the quick quality hint. The
+// underlying engine names ("qwen", "acestep") never leak.
 function labelFor(file) {
   const lower = file.toLowerCase();
   // Lyric/tags encoders (DualCLIPLoader)
-  if (lower.includes("qwen_0.6b") || lower.includes("qwen_0_6b")) return "Fast";
-  if (lower.includes("qwen_1.7b") || lower.includes("qwen_1_7b")) return "Standard";
-  if (lower.includes("qwen_4b"))                                  return "Best";
+  if (lower.includes("qwen_0.6b") || lower.includes("qwen_0_6b")) return "0.6B Fast";
+  if (lower.includes("qwen_1.7b") || lower.includes("qwen_1_7b")) return "1.7B Standard";
+  if (lower.includes("qwen_4b"))                                  return "4B Best";
   // UNET diffusion models
-  if (lower.includes("xl_sft"))     return "Studio (Best)";
-  if (lower.includes("xl_turbo"))   return "Turbo XL";
+  if (lower.includes("xl_sft"))     return "XL SFT Studio (Best)";
+  if (lower.includes("xl_turbo"))   return "XL Turbo";
   if (lower.includes("xl_base"))    return "XL Base";
-  if (lower.includes("v1.5_turbo")) return "Turbo";
-  if (lower.includes("v1.5_base") || lower.includes("v1.5") || lower.includes("v1_5")) return "Base";
+  if (lower.includes("v1.5_turbo")) return "v1.5 Turbo";
+  if (lower.includes("v1.5_base") || lower.includes("v1.5") || lower.includes("v1_5")) return "v1.5 Base";
   // Cover-art checkpoints
-  if (lower.includes("juggernaut")) return "Juggernaut (Photoreal)";
+  if (lower.includes("juggernaut")) return "Juggernaut XL (Photoreal)";
   if (lower.includes("sd_xl_base")) return "SDXL Base";
   // Fallback: strip extension + known prefixes; never leak "qwen" / "acestep".
   return file
