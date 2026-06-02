@@ -2355,21 +2355,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   />
                 </div>
 
-                {/* LM Negative Prompt — wired end-to-end. When non-empty,
-                    backend's workflow.js adds a second TextEncode node and
-                    repoints KSampler.negative to it (bypassing the default
-                    ConditioningZeroOut). Most effective on Studio + KSampler
-                    cfg > 1. Empty value falls back to the zero-out path. */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Words or ideas to steer the lyric model away from.">{t('lmNegativePrompt')}</label>
-                  <textarea
-                    value={lmNegativePrompt}
-                    onChange={(e) => setLmNegativePrompt(e.target.value)}
-                    placeholder={t('thingsToAvoid')}
-                    className="w-full h-16 bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg p-2 text-xs text-zinc-900 dark:text-white focus:outline-none resize-none"
-                  />
-                  <p className="text-[10px] text-zinc-500">{t('useWhenCfgScaleGreater')}</p>
-                </div>
+                {/* LM Negative Prompt — hidden. Tried wiring it (second
+                    TextEncodeAceStepAudio1.5 -> KSampler.negative); empirical
+                    A/B on tracks #61, #63, #64 reproduced audible distortion
+                    versus a clean control with same seed/prompt minus the
+                    negative. See docs/lm-negative-prompt.md. */}
               </div>
             )}
 
