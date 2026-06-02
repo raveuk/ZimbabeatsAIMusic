@@ -273,17 +273,21 @@ export const modelsApi = {
 // which is Ollama-backed.
 export const lyricsApi = {
   // Non-streaming: wait for full text. Used as a fallback.
-  write: async (theme: string, language?: string): Promise<{ lyrics: string }> =>
-    api<{ lyrics: string }>('/api/lyrics', { method: 'POST', body: { theme, language } }),
+  write: async (theme: string, language?: string, thinking?: boolean): Promise<{ lyrics: string }> =>
+    api<{ lyrics: string }>('/api/lyrics', { method: 'POST', body: { theme, language, thinking: !!thinking } }),
 
   // Streaming: invokes onChunk(partialText) repeatedly as Ollama emits tokens.
   // The full transcript is also returned in `lyrics` for callers that just
   // want the final value. Throws on network/auth errors before the first
   // chunk arrives. Stream protocol: NDJSON, one `{ response, done }` per line.
+  // `thinking=true` tells the backend to prepend a chain-of-thought planning
+  // instruction to the LLM prompt — same model, richer reasoning, ~2× wall
+  // time on cloud Gemma.
   writeStream: async (
     theme: string,
     language: string | undefined,
     onChunk: (partial: string) => void,
+    thinking?: boolean,
   ): Promise<{ lyrics: string }> => {
     const token = (await firebaseAuth.currentUser?.getIdToken()) ?? null;
     const res = await fetch(`${API_BASE}/api/lyrics?stream=1`, {
@@ -292,7 +296,7 @@ export const lyricsApi = {
         'content-type': 'application/json',
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
-      body: safeStringify({ theme, language }),
+      body: safeStringify({ theme, language, thinking: !!thinking }),
     });
     if (!res.ok || !res.body) {
       const detail = await res.text().catch(() => '');

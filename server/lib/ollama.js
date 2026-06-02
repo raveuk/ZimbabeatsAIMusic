@@ -21,13 +21,25 @@ const LANGUAGE_NAMES = {
   uk: "Ukrainian", ur: "Urdu", vi: "Vietnamese", yue: "Cantonese", zh: "Chinese",
 };
 
-export async function generateLyrics(theme, language) {
-  // Build the user prompt; tack a hard language instruction on the front when
-  // the caller passed one and it isn't English (the model defaults to English).
+// "Thinking" mode (Chain-of-Thought): when on, we prepend an instruction
+// telling the model to plan genre / mood / story arc first, then emit ONLY
+// the final lyrics. The system prompt's "Output ONLY song lyrics" guardrail
+// already enforces that the visible response is just the lyrics — the
+// planning happens in the model's internal generation but the post-system
+// constraint clips the output to the lyrics block.
+const CoT_PREAMBLE = "Before writing, briefly plan the song's genre, mood, story arc, and verse/chorus structure. Then write ONLY the finished lyrics with [verse]/[chorus]/[bridge] tags — do not include your planning notes.\n\n";
+
+function buildPrompt(theme, language, thinking) {
   const langName = LANGUAGE_NAMES[language];
-  const prompt = langName && language !== "en"
-    ? `Write the entire song in ${langName}. Use ${langName} grammar, vocabulary and idioms — do NOT mix in English.\n\nTheme: ${String(theme)}`
-    : String(theme);
+  const langInstr = langName && language !== "en"
+    ? `Write the entire song in ${langName}. Use ${langName} grammar, vocabulary and idioms — do NOT mix in English.\n\n`
+    : "";
+  const cot = thinking ? CoT_PREAMBLE : "";
+  return `${cot}${langInstr}Theme: ${String(theme)}`;
+}
+
+export async function generateLyrics(theme, language, opts = {}) {
+  const prompt = buildPrompt(theme, language, !!opts.thinking);
 
   const res = await fetch(`${OLLAMA_URL}/api/generate`, {
     method: "POST",
@@ -48,11 +60,8 @@ export async function generateLyrics(theme, language) {
 // caller can pipe it through to the browser. Each line is a JSON object like
 // `{"response":"<chunk>", "done":false}` — last line has done=true. Caller
 // owns the resulting ReadableStream + must handle/close it.
-export async function streamLyrics(theme, language) {
-  const langName = LANGUAGE_NAMES[language];
-  const prompt = langName && language !== "en"
-    ? `Write the entire song in ${langName}. Use ${langName} grammar, vocabulary and idioms — do NOT mix in English.\n\nTheme: ${String(theme)}`
-    : String(theme);
+export async function streamLyrics(theme, language, opts = {}) {
+  const prompt = buildPrompt(theme, language, !!opts.thinking);
 
   const res = await fetch(`${OLLAMA_URL}/api/generate`, {
     method: "POST",

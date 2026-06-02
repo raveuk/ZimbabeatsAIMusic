@@ -746,12 +746,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     try {
       // Streaming: each chunk arrives mid-flight and we update the textarea
       // live. Falls back to the blocking call if the stream blows up before
-      // the first chunk reaches us.
-      await lyricsApi.writeStream(theme, vocalLanguage, (partial) => setLyrics(partial));
+      // the first chunk reaches us. `thinking` toggles CoT planning in the
+      // prompt — better quality, longer wait.
+      await lyricsApi.writeStream(theme, vocalLanguage, (partial) => setLyrics(partial), thinking);
     } catch (err) {
       console.warn('streaming lyrics failed, falling back:', err);
       try {
-        const { lyrics: text } = await lyricsApi.write(theme, vocalLanguage);
+        const { lyrics: text } = await lyricsApi.write(theme, vocalLanguage, thinking);
         setLyrics(text);
       } catch (err2) {
         console.error('writeSimpleLyrics failed:', err2);
@@ -759,7 +760,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     } finally {
       setWritingSimpleLyrics(false);
     }
-  }, [songDescription, vocalLanguage]);
+  }, [songDescription, vocalLanguage, thinking]);
 
   // Format handler - uses LLM to enhance style/lyrics and auto-fill parameters
   const handleFormat = async (target: 'style' | 'lyrics') => {

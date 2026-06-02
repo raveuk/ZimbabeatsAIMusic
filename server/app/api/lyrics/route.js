@@ -14,13 +14,13 @@ export const POST = handler(async (req) => {
   await requireUser(req);
   const url = new URL(req.url);
   const wantsStream = url.searchParams.get("stream") === "1";
-  const { theme, language } = await req.json();
-  console.log(`[lyrics] theme="${String(theme || "").slice(0, 40)}" language=${JSON.stringify(language)} stream=${wantsStream}`);
+  const { theme, language, thinking } = await req.json();
+  console.log(`[lyrics] theme="${String(theme || "").slice(0, 40)}" language=${JSON.stringify(language)} stream=${wantsStream} thinking=${!!thinking}`);
   if (!theme || !String(theme).trim()) return json({ error: "enter a theme first" }, 400);
 
   if (wantsStream) {
     try {
-      const body = await streamLyrics(theme, language);
+      const body = await streamLyrics(theme, language, { thinking: !!thinking });
       // text/plain so the browser doesn't try to parse the partial NDJSON as
       // JSON. Disable buffering so chunks arrive promptly through CF Tunnel.
       return new Response(body, {
@@ -37,7 +37,7 @@ export const POST = handler(async (req) => {
   }
 
   try {
-    const lyrics = await generateLyrics(theme, language);
+    const lyrics = await generateLyrics(theme, language, { thinking: !!thinking });
     return json({ lyrics });
   } catch (e) {
     return json({ error: "lyric generation failed", detail: String(e.message || e) }, 502);
