@@ -2199,19 +2199,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               </div>
             </div>
 
-            {/* LM Backend */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('lmBackendLabel')}</label>
-              <select
-                value={lmBackend}
-                onChange={(e) => setLmBackend(e.target.value as 'pt' | 'vllm')}
-                className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
-              >
-                <option value="pt">{t('lmBackendPt')}</option>
-                <option value="vllm">{t('lmBackendVllm')}</option>
-              </select>
-              <p className="text-[10px] text-zinc-500">{t('lmBackendHint')}</p>
-            </div>
+            {/* LM Backend — hidden in the UI; ComfyUI is hardcoded to PT.
+                See docs/vlm-backend.md for the decision rationale.
+                State stays so other code paths that reference lmBackend
+                don't break — value is locked to 'pt'. */}
 
             {/* LM Model */}
             <div className="space-y-1.5">
