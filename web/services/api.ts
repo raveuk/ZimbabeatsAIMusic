@@ -263,8 +263,57 @@ function withSignedToken(url: string | undefined): string | undefined {
 // lyrics" / "Regenerate" buttons. Hits our backend's /api/lyrics route,
 // which is Ollama-backed.
 export const lyricsApi = {
+  // Non-streaming: wait for full text. Used as a fallback.
   write: async (theme: string, language?: string): Promise<{ lyrics: string }> =>
     api<{ lyrics: string }>('/api/lyrics', { method: 'POST', body: { theme, language } }),
+
+  // Streaming: invokes onChunk(partialText) repeatedly as Ollama emits tokens.
+  // The full transcript is also returned in `lyrics` for callers that just
+  // want the final value. Throws on network/auth errors before the first
+  // chunk arrives. Stream protocol: NDJSON, one `{ response, done }` per line.
+  writeStream: async (
+    theme: string,
+    language: string | undefined,
+    onChunk: (partial: string) => void,
+  ): Promise<{ lyrics: string }> => {
+    const token = (await firebaseAuth.currentUser?.getIdToken()) ?? null;
+    const res = await fetch(`${API_BASE}/api/lyrics?stream=1`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: safeStringify({ theme, language }),
+    });
+    if (!res.ok || !res.body) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(`${res.status}: ${detail.slice(0, 200) || 'lyric stream failed'}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let accumulated = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // NDJSON: split on newlines, keep last (possibly partial) for next pass.
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const obj = JSON.parse(trimmed) as { response?: string; done?: boolean };
+          if (obj.response) {
+            accumulated += obj.response;
+            onChunk(accumulated);
+          }
+        } catch { /* malformed line, ignore */ }
+      }
+    }
+    return { lyrics: accumulated.trim() };
+  },
 };
 
 export const songsApi = {

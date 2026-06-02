@@ -32,7 +32,7 @@ export async function generateLyrics(theme, language) {
   const res = await fetch(`${OLLAMA_URL}/api/generate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model: OLLAMA_MODEL, system: LYRICS_SYSTEM, prompt, stream: false }),
+    body: JSON.stringify({ model: OLLAMA_MODEL, system: LYRICS_SYSTEM, prompt, stream: false, keep_alive: "30m" }),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
@@ -42,4 +42,26 @@ export async function generateLyrics(theme, language) {
   const text = (data.response || "").trim();
   if (!text) throw new Error("Ollama returned empty lyrics");
   return text;
+}
+
+// Same as generateLyrics, but returns Ollama's NDJSON stream directly so the
+// caller can pipe it through to the browser. Each line is a JSON object like
+// `{"response":"<chunk>", "done":false}` — last line has done=true. Caller
+// owns the resulting ReadableStream + must handle/close it.
+export async function streamLyrics(theme, language) {
+  const langName = LANGUAGE_NAMES[language];
+  const prompt = langName && language !== "en"
+    ? `Write the entire song in ${langName}. Use ${langName} grammar, vocabulary and idioms — do NOT mix in English.\n\nTheme: ${String(theme)}`
+    : String(theme);
+
+  const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model: OLLAMA_MODEL, system: LYRICS_SYSTEM, prompt, stream: true, keep_alive: "30m" }),
+  });
+  if (!res.ok || !res.body) {
+    const detail = res.ok ? "no body" : await res.text().catch(() => "");
+    throw new Error(`Ollama ${res.status}: ${String(detail).slice(0, 200)}`);
+  }
+  return res.body;
 }

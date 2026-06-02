@@ -700,11 +700,22 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     const theme = songDescription.trim();
     if (!theme) return;
     setWritingSimpleLyrics(true);
+    // Clear so the user sees the new text appear from the top, not appended
+    // to whatever the previous draft was.
+    setLyrics('');
     try {
-      const { lyrics: text } = await lyricsApi.write(theme, vocalLanguage);
-      setLyrics(text);
+      // Streaming: each chunk arrives mid-flight and we update the textarea
+      // live. Falls back to the blocking call if the stream blows up before
+      // the first chunk reaches us.
+      await lyricsApi.writeStream(theme, vocalLanguage, (partial) => setLyrics(partial));
     } catch (err) {
-      console.error('writeSimpleLyrics failed:', err);
+      console.warn('streaming lyrics failed, falling back:', err);
+      try {
+        const { lyrics: text } = await lyricsApi.write(theme, vocalLanguage);
+        setLyrics(text);
+      } catch (err2) {
+        console.error('writeSimpleLyrics failed:', err2);
+      }
     } finally {
       setWritingSimpleLyrics(false);
     }
