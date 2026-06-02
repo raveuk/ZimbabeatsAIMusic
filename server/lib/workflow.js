@@ -19,6 +19,8 @@ const SAMPLER_NODE = "3"; // KSampler
 const SAVE_NODE = "107"; // SaveAudioMP3
 const UNET_NODE = "104"; // UNETLoader
 const SHIFT_NODE = "78"; // ModelSamplingAuraFlow
+const ZERO_OUT_NODE = "47";   // ConditioningZeroOut — feeds KSampler.negative by default
+const NEG_PROMPT_NODE = "95"; // synthesised at runtime; second TextEncodeAceStepAudio1.5
 
 // Map the dropdown selector (sent by the UI as `ditModel`) to the actual
 // safetensors file ComfyUI should load. Unknown values fall through to studio,
@@ -122,6 +124,29 @@ export function buildGraph(input) {
   // range (1–7 is the practically useful band).
   if (input.shift != null && g[SHIFT_NODE]) {
     g[SHIFT_NODE].inputs.shift = clamp(Number(input.shift), 1, 7);
+  }
+
+  // Negative prompt — when the caller supplies non-empty text we add a
+  // SECOND TextEncodeAceStepAudio1.5 node (same lyrics + LM settings, but
+  // tags = the negative text) and repoint KSampler.negative to it. With
+  // CFG > 1 on the Studio model this gives real "steer-away-from" guidance.
+  // Empty negative falls through the default ConditioningZeroOut path.
+  const neg = String(input.negativePrompt || "").trim();
+  if (neg && g[PROMPT_NODE] && g[SAMPLER_NODE]) {
+    g[NEG_PROMPT_NODE] = {
+      class_type: "TextEncodeAceStepAudio1.5",
+      inputs: {
+        ...g[PROMPT_NODE].inputs, // start from a copy so lyrics, BPM, seed,
+                                  // clip, LM-sampling knobs etc. all match —
+                                  // CFG cancels out the shared parts and
+                                  // only the *tag* delta drives the steer.
+        tags: neg,
+      },
+      _meta: { title: "TextEncodeAceStepAudio1.5 (Negative)" },
+    };
+    g[SAMPLER_NODE].inputs.negative = [NEG_PROMPT_NODE, 0];
+    // ConditioningZeroOut (node 47) is left in the graph but orphaned;
+    // ComfyUI skips unreferenced nodes.
   }
 
   g[saveNode].inputs.filename_prefix = input.filenamePrefix || "music_app/track";

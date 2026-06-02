@@ -232,7 +232,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [lmCfgScale, setLmCfgScale] = useState(2.2);
   const [lmTopK, setLmTopK] = useState(0);
   const [lmTopP, setLmTopP] = useState(0.92);
-  const [lmNegativePrompt, setLmNegativePrompt] = useState('NO USER INPUT');
+  // Default empty so an unset state never gets sent as "the user wants to
+  // avoid the literal phrase 'NO USER INPUT'". Placeholder text in the
+  // textarea shows the example when the field is blank.
+  const [lmNegativePrompt, setLmNegativePrompt] = useState('');
 
   // Expert Parameters (now in Advanced section)
   const [referenceAudioUrl, setReferenceAudioUrl] = useState('');
@@ -2352,7 +2355,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   />
                 </div>
 
-                {/* LM Negative Prompt */}
+                {/* LM Negative Prompt — wired end-to-end. When non-empty,
+                    backend's workflow.js adds a second TextEncode node and
+                    repoints KSampler.negative to it (bypassing the default
+                    ConditioningZeroOut). Most effective on Studio + KSampler
+                    cfg > 1. Empty value falls back to the zero-out path. */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Words or ideas to steer the lyric model away from.">{t('lmNegativePrompt')}</label>
                   <textarea

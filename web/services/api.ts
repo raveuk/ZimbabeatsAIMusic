@@ -555,6 +555,10 @@ function toBackendBody(p: GenerationParams) {
     topP:           typeof p.lmTopP === 'number' && p.lmTopP > 0 && p.lmTopP <= 1 ? p.lmTopP : undefined,
     topK:           typeof p.lmTopK === 'number' && p.lmTopK >= 0 ? p.lmTopK : undefined,
     shift:          typeof p.shift === 'number' && p.shift > 0 ? p.shift : undefined,
+    // Negative prompt — non-empty triggers a graph rewrite on the backend
+    // (second TextEncode node + repointed KSampler.negative). Empty value
+    // falls back to ConditioningZeroOut (the canonical setup).
+    negativePrompt: typeof p.lmNegativePrompt === 'string' && p.lmNegativePrompt.trim() ? p.lmNegativePrompt.trim() : undefined,
     // randomSeed=true or seed=-1 (CreatePanel's sentinel for "random") -> undefined.
     seed: p.randomSeed ? undefined : (typeof p.seed === 'number' && p.seed >= 0 ? p.seed : undefined),
     writeLyrics,

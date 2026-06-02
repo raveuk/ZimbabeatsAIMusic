@@ -52,6 +52,7 @@ export const POST = handler(async (req) => {
     topP: body.topP,               // LM top_p
     topK: body.topK,               // LM top_k (0 = disabled)
     shift: body.shift,             // ModelSamplingAuraFlow shift (advanced)
+    negativePrompt: body.negativePrompt, // when non-empty: real negative conditioning
     quality: body.quality,         // MP3 bitrate: "V0" | "128k" | "320k"
     ditModel: body.ditModel,       // "studio" (XL SFT) | "turbo" — picks UNET file
     voiceModel: body.voiceModel ?? null, // trained RVC voice (.pth filename) or null
