@@ -297,7 +297,7 @@ export const translations = {
     lmModel06B: '0.6B (Lightest, ~0.5 GB VRAM)',
     lmModel17B: '1.7B (Balanced, ~1.5 GB VRAM)',
     lmModel4B: '4B (Best quality, ~4 GB VRAM)',
-    lmModelHint: 'Controls the LLM used for lyrics/style enhancement. Auto-downloads if not present.',
+    lmModelHint: 'Internal text encoder that turns your lyrics + style into the music model conditioning. Larger = more nuanced phrasing.',
     
     // CreatePanel - Transcription
     transcribing: 'Transcribing...',
@@ -896,7 +896,7 @@ export const translations = {
     lmModel06B: '0.6B（最轻量，~0.5 GB 显存）',
     lmModel17B: '1.7B（均衡，~1.5 GB 显存）',
     lmModel4B: '4B（最佳质量，~4 GB 显存）',
-    lmModelHint: '控制用于歌词/风格增强的 LLM。如不存在将自动下载。',
+    lmModelHint: '将歌词和风格转换为音乐模型条件向量的内部文本编码器。越大短语越细腻。',
     
     // CreatePanel - Transcription
     transcribing: '转录中...',
@@ -1495,7 +1495,7 @@ export const translations = {
     lmModel06B: '0.6B（最軽量、〜0.5 GB VRAM）',
     lmModel17B: '1.7B（バランス、〜1.5 GB VRAM）',
     lmModel4B: '4B（最高品質、〜4 GB VRAM）',
-    lmModelHint: '歌詞/スタイル強化に使用するLLMを制御。未インストールの場合自動ダウンロード。',
+    lmModelHint: '歌詞とスタイルを音楽モデルの条件付けに変換する内部テキストエンコーダー。大きいほど表現が繊細になります。',
     
     // CreatePanel - Transcription
     transcribing: '文字起こし中...',
@@ -2094,7 +2094,7 @@ export const translations = {
     lmModel06B: '0.6B (가장 가벼움, ~0.5 GB VRAM)',
     lmModel17B: '1.7B (균형, ~1.5 GB VRAM)',
     lmModel4B: '4B (최고 품질, ~4 GB VRAM)',
-    lmModelHint: '가사/스타일 향상에 사용되는 LLM을 제어. 없으면 자동 다운로드.',
+    lmModelHint: '가사와 스타일을 음악 모델의 조건 벡터로 변환하는 내부 텍스트 인코더. 클수록 표현이 섬세해집니다.',
     
     // CreatePanel - Transcription
     transcribing: '전사 중...',
