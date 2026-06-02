@@ -31,27 +31,33 @@ export const StemsModal: React.FC<StemsModalProps> = ({ songId, songTitle, onClo
   const [error, setError] = useState<string | null>(null);
   const [stems, setStems] = useState<StemMap>({});
   const [playing, setPlaying] = useState<string | null>(null);
+  // Elapsed-seconds counter shown while extracting. Resets when the modal opens.
+  const [elapsed, setElapsed] = useState(0);
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
 
   useEffect(() => {
     let cancelled = false;
+    const startedAt = Date.now();
+    const tick = setInterval(() => {
+      if (!cancelled) setElapsed(Math.round((Date.now() - startedAt) / 1000));
+    }, 250);
     (async () => {
       try {
         const r = await songsApi.extractStems(songId);
         if (cancelled) return;
         setStems(r.stems || {});
         if (!Object.keys(r.stems || {}).length) {
-          setError('Backend returned no stems. ComfyUI may have produced unexpected output.');
+          setError('No stems returned. Try again or pick a different track.');
         }
       } catch (e) {
         if (cancelled) return;
         const msg = e instanceof Error ? e.message : 'Stem extraction failed';
         setError(msg);
       } finally {
-        if (!cancelled) setBusy(false);
+        if (!cancelled) { setBusy(false); clearInterval(tick); }
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearInterval(tick); };
   }, [songId]);
 
   const togglePlay = (key: string) => {
@@ -84,9 +90,13 @@ export const StemsModal: React.FC<StemsModalProps> = ({ songId, songTitle, onClo
 
         <div className="p-5 space-y-3">
           {busy && (
-            <div className="flex items-center gap-3 text-sm text-zinc-400 py-6 justify-center">
-              <Loader2 size={18} className="animate-spin" />
-              <span>Running Demucs (~15–60s on a 3090)…</span>
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 size={22} className="animate-spin text-pink-400" />
+              <div className="text-sm text-zinc-300">Extracting stems…</div>
+              <div className="text-xs text-zinc-500 tabular-nums">
+                {Math.floor(elapsed / 60).toString().padStart(2, '0')}:
+                {(elapsed % 60).toString().padStart(2, '0')}
+              </div>
             </div>
           )}
 
@@ -136,9 +146,6 @@ export const StemsModal: React.FC<StemsModalProps> = ({ songId, songTitle, onClo
           })}
         </div>
 
-        <div className="px-5 py-3 border-t border-white/5 text-[11px] text-zinc-500">
-          Powered by Demucs (htdemucs). Stems saved alongside the original track.
-        </div>
       </div>
     </div>
   );
