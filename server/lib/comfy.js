@@ -1,12 +1,18 @@
 // Thin client for the ComfyUI HTTP API.
+import { PROGRESS_CLIENT_ID } from "./progress.js";
+
 const COMFY_URL = process.env.COMFY_URL || "http://127.0.0.1:8188";
 
 // Submit a graph; returns { prompt_id } or throws with ComfyUI's validation error.
+// IMPORTANT: ComfyUI's progress_state events are targeted at the submitter's
+// client_id — so we ALWAYS pass `client_id: PROGRESS_CLIENT_ID` to make the
+// targeted events flow to our long-lived progress WebSocket (otherwise the
+// percentage in the workspace stays blank).
 export async function submitPrompt(graph) {
   const res = await fetch(`${COMFY_URL}/prompt`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ prompt: graph }),
+    body: JSON.stringify({ prompt: graph, client_id: PROGRESS_CLIENT_ID }),
   });
   const body = await res.json();
   if (!res.ok) {

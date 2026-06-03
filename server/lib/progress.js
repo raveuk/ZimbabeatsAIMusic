@@ -1,7 +1,16 @@
 // Live render progress, by subscribing once to ComfyUI's WebSocket.
-// ComfyUI broadcasts execution + progress events to every connected client, so
-// we keep one long-lived socket and remember the latest step count per prompt.
-const WS_URL = (process.env.COMFY_URL || "http://127.0.0.1:8188").replace(/^http/, "ws") + "/ws?clientId=music-app-progress";
+// ComfyUI broadcasts execution + progress events; we keep one long-lived
+// socket and remember the latest step count per prompt.
+//
+// IMPORTANT: ComfyUI moved from `"progress"` events (old) to `"progress_state"`
+// events (current, ~ComfyUI v0.3.50+). The new format also targets a specific
+// client_id rather than broadcasting — so /api/generate MUST submit prompts
+// WITH the matching client_id in the request body (`{prompt: graph, client_id}`),
+// otherwise the progress events are sent to whichever socket connected last
+// (usually the user's browser tab) and our subscriber sees nothing. submitPrompt
+// in lib/comfy.js handles that.
+export const PROGRESS_CLIENT_ID = "music-app-progress";
+const WS_URL = (process.env.COMFY_URL || "http://127.0.0.1:8188").replace(/^http/, "ws") + `/ws?clientId=${PROGRESS_CLIENT_ID}`;
 
 // Survive Next.js dev hot-reloads: keep state + socket on globalThis.
 const g = globalThis;
@@ -12,10 +21,13 @@ function connect() {
   let ws;
   try {
     ws = new WebSocket(WS_URL);
-  } catch {
+  } catch (e) {
+    console.warn("[progress.js] WebSocket constructor failed:", e?.message);
     return;
   }
+  console.log("[progress.js] connecting to", WS_URL);
   S.ws = ws;
+  ws.addEventListener("open", () => console.log("[progress.js] connected"));
 
   ws.addEventListener("message", (ev) => {
     if (typeof ev.data !== "string") return; // ignore binary preview frames
@@ -30,9 +42,23 @@ function connect() {
       S.current = data.prompt_id ?? S.current;
       if (data.node == null && data.prompt_id) S.map.delete(data.prompt_id); // that prompt finished
     } else if (type === "progress") {
-      // ComfyUI may omit prompt_id on progress; attribute it to the running prompt.
+      // Legacy ComfyUI shape — kept as a fallback for older servers.
       const pid = data.prompt_id ?? S.current;
       if (pid && data.max) S.map.set(pid, { value: data.value, max: data.max });
+    } else if (type === "progress_state") {
+      // Current ComfyUI shape (v0.3.50+):
+      //   { prompt_id, nodes: { "<node_id>": { value, max, state, ... }, ... } }
+      // Pick the running node with the biggest progress so a multi-stage
+      // workflow (e.g. cover prompt + audio prompt) shows the most useful %.
+      const pid = data.prompt_id ?? S.current;
+      const nodes = data.nodes && typeof data.nodes === "object" ? Object.values(data.nodes) : [];
+      let best = null;
+      for (const n of nodes) {
+        if (!n || !n.max) continue;
+        const pct = n.value / n.max;
+        if (!best || pct > best.value / best.max) best = { value: n.value, max: n.max };
+      }
+      if (pid && best) S.map.set(pid, best);
     } else if (type === "execution_success" || type === "execution_error" || type === "execution_interrupted") {
       const pid = data.prompt_id ?? S.current;
       if (pid) S.map.delete(pid);
