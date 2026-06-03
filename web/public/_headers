@@ -1,0 +1,15 @@
+# Cloudflare Pages static-header rules.
+#
+# FFmpeg.wasm (used by the in-browser Create Video modal) needs
+# SharedArrayBuffer, which the browser only exposes when the page is
+# "cross-origin isolated". That requires both COOP and COEP set.
+#
+# We use COEP: credentialless instead of require-corp so cross-origin
+# resources (Firebase Auth iframe, picsum fallback, api.zimbabeats.com
+# audio/cover responses, etc.) still load — they're just fetched without
+# credentials. The Cloudflare Tunnel responses we own all set CORS
+# explicitly so the only places this could surface as a regression are
+# embeds from origins we don't control, which the app doesn't load.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless

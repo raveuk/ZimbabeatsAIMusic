@@ -24,7 +24,7 @@ interface CreatePanelProps {
   isGenerating: boolean;
   initialData?: { song: Song, timestamp: number } | null;
   createdSongs?: Song[];
-  pendingAudioSelection?: { target: 'reference' | 'source'; url: string; title?: string } | null;
+  pendingAudioSelection?: { target: 'reference' | 'source' | 'edit'; url: string; title?: string } | null;
   onAudioSelectionApplied?: () => void;
 }
 
@@ -1041,7 +1041,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     setTempAudioUrl('');
   };
 
-  const applyAudioTargetUrl = (target: 'reference' | 'source', url: string, title?: string) => {
+  const applyAudioTargetUrl = (target: 'reference' | 'source' | 'edit', url: string, title?: string) => {
     const derivedTitle = title ? title.replace(/\.[^/.]+$/, '') : getAudioLabel(url);
     if (target === 'reference') {
       setReferenceAudioUrl(url);
@@ -1053,7 +1053,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       setSourceAudioTitle(derivedTitle);
       setSourceTime(0);
       setSourceDuration(0);
-      if (taskType === 'text2music') {
+      // The Song-row "Edit Audio" menu lands here with target='edit' so
+      // we flip the Task Type to the Edit-task path (same melody, new
+      // lyrics — backend's task_type=lego). 'source' default stays as
+      // 'cover' (the user's natural starting point when feeding source
+      // audio in).
+      if (target === 'edit') {
+        setTaskType('edit');
+      } else if (taskType === 'text2music') {
         setTaskType('cover');
       }
     }

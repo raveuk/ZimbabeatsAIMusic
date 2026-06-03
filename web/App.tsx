@@ -85,7 +85,7 @@ function AppContent() {
     return Number.isFinite(stored) && stored >= 240 && stored <= 560 ? stored : 360;
   });
   const createPanelResizeRef = useRef<{ startX: number; startW: number } | null>(null);
-  const [pendingAudioSelection, setPendingAudioSelection] = useState<{ target: 'reference' | 'source'; url: string; title?: string } | null>(null);
+  const [pendingAudioSelection, setPendingAudioSelection] = useState<{ target: 'reference' | 'source' | 'edit'; url: string; title?: string } | null>(null);
 
   // Mobile UI Toggle
   const [mobileShowList, setMobileShowList] = useState(false);
@@ -1260,6 +1260,18 @@ function AppContent() {
     setMobileShowList(false);
   };
 
+  // "Edit Audio" — repurposed from the legacy /editor route (which never
+  // existed) to drop the user into the Create panel pre-loaded for an
+  // Edit-task generation: same melody, new lyrics. CreatePanel picks up
+  // the `target: 'edit'` pendingAudioSelection and flips Custom mode +
+  // taskType='edit' for them.
+  const handleEditAudio = (song: Song) => {
+    if (!song.audioUrl) return;
+    setPendingAudioSelection({ target: 'edit', url: song.audioUrl, title: song.title });
+    setCurrentView('create');
+    setMobileShowList(false);
+  };
+
   const handleUseUploadAsReference = (track: { audio_url: string; filename: string }) => {
     setPendingAudioSelection({
       target: 'reference',
@@ -1294,6 +1306,19 @@ function AppContent() {
     setSongForVideo(song);
     setIsVideoModalOpen(true);
   };
+
+  // Listen for `myuzika:edit-audio` events dispatched by the song-row
+  // dropdown menus (SongDropdownMenu's handleEditAudio fallback). Routes
+  // to the Create panel pre-loaded with task_type='edit' and this song
+  // as the source. Avoids prop-drilling through 8+ dropdown callsites.
+  useEffect(() => {
+    const onEditAudioEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ song: Song }>).detail;
+      if (detail?.song) handleEditAudio(detail.song);
+    };
+    window.addEventListener('myuzika:edit-audio', onEditAudioEvent as EventListener);
+    return () => window.removeEventListener('myuzika:edit-audio', onEditAudioEvent as EventListener);
+  }, []); // handleEditAudio is stable enough — uses setState only
 
   // Handle username setup
   const handleUsernameSubmit = async (username: string) => {

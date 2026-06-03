@@ -141,12 +141,13 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
         onClose();
     };
 
+    // Fallback when no `onEditAudio` prop is wired. The legacy
+    // `window.open('/editor?…')` target never existed, so we now dispatch
+    // a CustomEvent that App.tsx listens for — it routes to the Create
+    // panel with task_type='edit' + the song pre-loaded as source.
     const handleEditAudio = () => {
-        if (!song.audioUrl) return;
-        const audioUrl = song.audioUrl.startsWith('http')
-            ? song.audioUrl
-            : `${window.location.origin}${song.audioUrl}`;
-        window.open(`/editor?audioUrl=${encodeURIComponent(audioUrl)}`, '_blank');
+        if (!song?.id) return;
+        window.dispatchEvent(new CustomEvent('myuzika:edit-audio', { detail: { song } }));
         onClose();
     };
 
