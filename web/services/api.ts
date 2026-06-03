@@ -1134,12 +1134,15 @@ export const trainingApi = {
       body: { datasetId: _activeDatasetId, ...body },
     }),
 
-  // ---------------- Auto-label (Phase 19.x — not yet wired) ----
-  autoLabel: async (_body: any, _t?: string) => {
-    // Backend route /api/training/auto-label is a follow-up; for now we
-    // surface a clear message so the button reports honestly.
-    throw new Error('Auto-label is not implemented yet — fill tags + lyrics manually for now.');
-  },
+  // ---------------- Auto-label -------------------------------
+  // Runs Granite ASR (when transcribeLyrics is on) + Ollama tag generation
+  // over the active dataset. Sync HTTP call — the UI's spinner stays up
+  // for the duration. ~10s per sample with ASR; <2s per sample without.
+  autoLabel: async (body: any, _t?: string) =>
+    api('/api/training/auto-label', {
+      method: 'POST',
+      body: { datasetId: _activeDatasetId, ...body },
+    }),
 
   // ---------------- Train LoRA tab ----------------------------
   preprocess: async (body: any, _t?: string) => {
@@ -1185,9 +1188,18 @@ export const trainingApi = {
     return api(`/api/training/jobs${q.toString() ? `?${q}` : ''}`);
   },
 
-  // ---------------- Import (Phase 19.x — not yet wired) -------
-  importDataset: async (_file: File, _datasetName: string, _t?: string) => {
-    throw new Error('Import dataset JSON is not implemented yet — use Upload Audio instead.');
+  // ---------------- Import ------------------------------------
+  // Multipart upload of a `dataset.json` (the file Save Dataset writes).
+  // The audio referenced inside is NOT copied — caller must upload it via
+  // the Dataset Builder tab afterwards. Response includes audioMissing
+  // count so the UI can surface a "upload N more audio files" hint.
+  importDataset: async (file: File, datasetName: string, _t?: string) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('datasetName', datasetName);
+    const r: any = await uploadMultipart('/api/training/datasets/import', fd);
+    if (r?.datasetId) _activeDatasetId = r.datasetId;
+    return r;
   },
 };
 

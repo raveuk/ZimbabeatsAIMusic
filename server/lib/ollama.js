@@ -56,6 +56,66 @@ export async function generateLyrics(theme, language, opts = {}) {
   return text;
 }
 
+// Auto-label helpers for the LoRA training pipeline (Task #19). Given a
+// sample's existing fields (filename, transcribed lyrics) we ask Ollama for
+// a compact JSON describing the music — tags, genre, bpm, key, language,
+// instrumental, plus optionally re-formatted lyrics with [verse]/[chorus]
+// tags. Errors bubble up so the caller can fall back to the un-labeled row.
+const AUTOLABEL_SYSTEM =
+  "You annotate music training samples. Reply ONLY with valid JSON — no commentary, no code fence.";
+
+const AUTOLABEL_FIELDS_DOC = `Return JSON with these keys:
+{
+  "tags": "comma-separated style tags (genre, mood, instruments, era)",
+  "genre": "single genre word",
+  "bpm": <integer 40-220 or 0 if unknown>,
+  "key": "<key string like 'C major' or '' if unknown>",
+  "language": "<ISO 639-1 language code like 'en' if vocal, '' if instrumental>",
+  "instrumental": <true if no vocals else false>
+}`;
+
+export async function autoLabelSample({ filename, lyrics }) {
+  const lyricsBlock = lyrics ? `\n\nLyrics:\n${String(lyrics).slice(0, 1500)}` : "";
+  const prompt = `Filename: ${filename}${lyricsBlock}\n\n${AUTOLABEL_FIELDS_DOC}\n\nRespond with JSON only.`;
+  const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      model: OLLAMA_MODEL, system: AUTOLABEL_SYSTEM, prompt,
+      stream: false, format: "json", keep_alive: "30m",
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Ollama ${res.status}: ${detail.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const text = (data.response || "").trim();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Ollama auto-label returned non-JSON: ${text.slice(0, 120)}`);
+  }
+}
+
+// Take raw ASR output and re-section it as [verse]/[chorus]/[bridge] for
+// ACE-Step training. Cheap shaping pass — the user can always edit manually.
+export async function formatLyricsForTraining(rawLyrics) {
+  const prompt = `Re-format the following lyrics with [verse], [chorus] and [bridge] section tags. Keep the original words; only add structure tags and line breaks. Output ONLY the lyrics, no commentary.\n\n${String(rawLyrics).slice(0, 4000)}`;
+  const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      model: OLLAMA_MODEL,
+      system: "You re-format song lyrics with section tags. Output ONLY the lyrics.",
+      prompt, stream: false, keep_alive: "30m",
+    }),
+  });
+  if (!res.ok) throw new Error(`Ollama ${res.status}`);
+  const data = await res.json();
+  return (data.response || "").trim();
+}
+
 // Same as generateLyrics, but returns Ollama's NDJSON stream directly so the
 // caller can pipe it through to the browser. Each line is a JSON object like
 // `{"response":"<chunk>", "done":false}` — last line has done=true. Caller
