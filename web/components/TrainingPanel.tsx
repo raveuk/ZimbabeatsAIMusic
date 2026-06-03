@@ -543,32 +543,77 @@ export const TrainingPanel: React.FC = () => {
     setTrainingProgress(t('startingTraining'));
     setTrainingLog('');
     setTrainingMetrics(null);
+    setCompletedSteps(prev => new Set([...prev].filter(s => s !== 'train')));
     try {
-      const result = await trainingApi.startTraining({
+      // The backend POST returns immediately with a jobId — training runs
+      // detached as a Python child for 15-180 min. The poll effect below
+      // (driven by `isTraining`) is what actually updates the UI.
+      const result: any = await trainingApi.startTraining({
         ...trainingParams,
         resumeCheckpoint: trainingParams.resumeCheckpoint || null,
       }, token);
-      setTrainingProgress(result.progress as string);
-      setTrainingLog(result.log as string);
-      setTrainingMetrics(result.metrics);
-      markStep('train');
+      const job = result?.job;
+      if (job) {
+        setTrainingProgress(`Started job #${job.id} — ${job.status}`);
+        if (job.totalSteps > 0) setTrainingMetrics({ totalSteps: job.totalSteps } as any);
+      }
     } catch (error) {
       setTrainingProgress(`${t('error')}: ${error instanceof Error ? error.message : 'Failed'}`);
-    } finally {
       setIsTraining(false);
     }
-  }, [token, trainingParams, t, markStep]);
+    // NOTE: isTraining stays true until the poll effect sees status=done|error|cancelled.
+  }, [token, trainingParams, t]);
 
   const handleStopTraining = useCallback(async () => {
     if (!token) return;
     try {
-      const result = await trainingApi.stopTraining(token);
-      setTrainingProgress(result.status as string);
-      setIsTraining(false);
+      const result: any = await trainingApi.stopTraining(token);
+      setTrainingProgress(result?.job?.status === 'cancelled' ? 'Cancelled.' : 'Stopping…');
+      // isTraining will flip to false when the poll effect sees 'cancelled'.
     } catch (error) {
       console.error('Failed to stop training:', error);
     }
   }, [token]);
+
+  // === Progress polling ===========================================
+  // While a training run is in flight, hit /api/training/jobs/{active}
+  // every 3s to update step counter / loss / log tail / status. Effect
+  // tears down on unmount or when isTraining flips false.
+  useEffect(() => {
+    if (!isTraining || !token) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const r: any = await trainingApi.getActiveJob();
+        if (cancelled || !r?.job) return;
+        const job = r.job;
+        const pct = job.percent != null ? `${job.percent}%` : '';
+        const step = (job.currentStep || 0) + (job.totalSteps ? `/${job.totalSteps}` : '');
+        const loss = job.lastLoss != null ? `loss ${Number(job.lastLoss).toFixed(4)}` : '';
+        setTrainingProgress(`${job.status} — step ${step}${pct ? ` (${pct})` : ''}${loss ? ` · ${loss}` : ''}`);
+        if (job.logTail) setTrainingLog(job.logTail);
+        setTrainingMetrics({
+          currentStep: job.currentStep,
+          totalSteps: job.totalSteps,
+          lastLoss: job.lastLoss,
+          percent: job.percent,
+        } as any);
+        if (['done', 'error', 'cancelled'].includes(job.status)) {
+          setIsTraining(false);
+          if (job.status === 'done') markStep('train');
+          if (job.status === 'error' && job.errorMessage) {
+            setTrainingProgress(`Error: ${String(job.errorMessage).slice(0, 200)}`);
+          }
+        }
+      } catch (e) {
+        // Transient — keep polling unless it's been failing for a while.
+        if (!cancelled) console.warn('training poll error:', e);
+      }
+    };
+    poll();                        // immediate first tick so the UI doesn't sit blank for 3s
+    const id = setInterval(poll, 3000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [isTraining, token, markStep]);
 
   // === Export ===
   const handleExportLora = useCallback(async () => {
