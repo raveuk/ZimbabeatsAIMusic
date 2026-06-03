@@ -127,6 +127,8 @@ export const POST = handler(async (req) => {
     quality: body.quality,         // MP3 bitrate: "V0" | "128k" | "320k"
     ditModel: body.ditModel,       // "studio" (XL SFT) | "turbo" — picks UNET file
     voiceModel: body.voiceModel ?? null, // trained RVC voice (.pth filename) or null
+    loraName:     body.loraName ?? null,        // trained LoRA .safetensors filename (Task #19)
+    loraStrength: typeof body.loraStrength === "number" ? body.loraStrength : 1.0,
     taskType,                              // "text2music" | "cover" | …
     uploadId: body.uploadId ?? null,       // staged source audio for cover/repaint/…
     audioCoverStrength: body.audioCoverStrength, // 0 = identical, 1 = full re-stylize

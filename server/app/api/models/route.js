@@ -117,5 +117,29 @@ export const GET = handler(async () => {
     } catch {}
   }
 
-  return json({ lmModels, unetModels, coverModels, voices });
+  // Trained LoRAs (Task #19) — query ComfyUI's LoraLoaderModelOnly dropdown
+  // to enumerate every .safetensors in models/loras/. The CreatePanel LoRA
+  // picker hydrates from this. Failure is non-fatal — we just return an
+  // empty array and the picker shows "No trained LoRAs yet".
+  let loras = [];
+  try {
+    const r = await fetch(`${COMFY_URL}/object_info/LoraLoaderModelOnly`, { cache: "no-store" });
+    if (r.ok) {
+      const data = await r.json();
+      const choices = data?.LoraLoaderModelOnly?.input?.required?.lora_name?.[0] || [];
+      const seen = new Set();
+      for (const c of choices) {
+        const file = String(c).replace(/^local:/, "");
+        if (!file.toLowerCase().endsWith(".safetensors")) continue;
+        if (seen.has(file)) continue;
+        seen.add(file);
+        // Friendlier label: strip our "lora_u{u}_j{j}_" prefix that
+        // exportLora adds, leaving just the user-chosen training name.
+        const pretty = file.replace(/^lora_u\d+_j\d+_/, "").replace(/\.safetensors$/i, "");
+        loras.push({ id: file, file, label: pretty || file });
+      }
+    }
+  } catch {}
+
+  return json({ lmModels, unetModels, coverModels, voices, loras });
 });

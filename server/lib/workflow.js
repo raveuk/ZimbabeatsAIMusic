@@ -126,6 +126,25 @@ export function buildGraph(input) {
   if (input.shift != null && g[SHIFT_NODE]) {
     g[SHIFT_NODE].inputs.shift = clamp(Number(input.shift), 1, 7);
   }
+
+  // LoRA splice (Task #19) — when the user picks a trained LoRA from the
+  // CreatePanel dropdown, inject a `LoraLoaderModelOnly` node between
+  // UNETLoader and ModelSamplingAuraFlow. The strength slider maps onto
+  // `strength_model`. No-op when loraName is absent so existing prompts
+  // are bit-identical to pre-Phase-19 behavior.
+  if (input.loraName && g[UNET_NODE] && g[SHIFT_NODE]) {
+    const LORA_NODE = "150"; // free slot in the existing template
+    g[LORA_NODE] = {
+      class_type: "LoraLoaderModelOnly",
+      inputs: {
+        model: [UNET_NODE, 0],
+        lora_name: String(input.loraName),
+        strength_model: clamp(Number(input.loraStrength ?? 1.0), 0, 2),
+      },
+      _meta: { title: "LoRA (trained)" },
+    };
+    g[SHIFT_NODE].inputs.model = [LORA_NODE, 0];
+  }
   // Negative prompt support removed: routing a second TextEncode into
   // KSampler.negative caused reproducible distortion on Studio + cfg=5.
   // The canonical ConditioningZeroOut path stays. See

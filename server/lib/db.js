@@ -92,3 +92,44 @@ db.exec(`
 
 // Add lrc_path so Phase 2 can cache transcribed karaoke output per track.
 if (!cols.includes("lrc_path")) db.exec("ALTER TABLE tracks ADD COLUMN lrc_path TEXT");
+
+// ---------------------------------------------------------------------------
+// LoRA training (Task #19) — the Training page wires through these tables.
+// `lora_datasets` is the user's labeled songs (samples_json holds the per-row
+// {filename, tags, lyrics, …} list). `lora_jobs` tracks every preprocess /
+// train run as a Python child process; refreshLoraJob() tails the log file
+// to update progress / loss without blocking the request thread.
+// ---------------------------------------------------------------------------
+db.exec(`
+  CREATE TABLE IF NOT EXISTS lora_datasets (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name          TEXT NOT NULL,
+    samples_json  TEXT NOT NULL,
+    settings_json TEXT,
+    dataset_path  TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, name)
+  );
+  CREATE TABLE IF NOT EXISTS lora_jobs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    dataset_id      INTEGER REFERENCES lora_datasets(id) ON DELETE SET NULL,
+    name            TEXT NOT NULL,
+    kind            TEXT NOT NULL,
+    pid             INTEGER,
+    status          TEXT NOT NULL DEFAULT 'queued',
+    params_json     TEXT NOT NULL,
+    log_path        TEXT,
+    current_step    INTEGER DEFAULT 0,
+    total_steps     INTEGER DEFAULT 0,
+    last_loss       REAL,
+    loss_log_json   TEXT,
+    tensor_path     TEXT,
+    lora_filename   TEXT,
+    error_message   TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+// Per-user LoRA quota — NULL = unlimited, mirrors track_quota.
+if (!userCols.includes("lora_quota")) db.exec("ALTER TABLE users ADD COLUMN lora_quota INTEGER");

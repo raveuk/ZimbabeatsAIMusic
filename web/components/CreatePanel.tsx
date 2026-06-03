@@ -166,17 +166,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   // empty and the picker is hidden entirely.
   const [voiceModel, setVoiceModel] = useState<string>(() => localStorage.getItem('ace-voiceModel') || '');
   const [voiceOptions, setVoiceOptions] = useState<ConfiguredModel[]>([]);
+  // Trained LoRAs catalogue — Task #19. Populated from /api/models which
+  // queries ComfyUI's LoraLoaderModelOnly dropdown so freshly-exported LoRAs
+  // appear as soon as the Training-page Export button finishes.
+  const [trainedLoras, setTrainedLoras] = useState<ConfiguredModel[]>([]);
+  const [trainedLoraName, setTrainedLoraName] = useState<string>(() => localStorage.getItem('ace-trainedLora') || '');
   useEffect(() => {
     let cancelled = false;
-    modelsApi.list().then(({ voices }) => {
+    modelsApi.list().then(({ voices, loras }: any) => {
       if (cancelled) return;
       setVoiceOptions(voices || []);
-      // Drop a saved pick if it's no longer available on the backend.
-      setVoiceModel((prev) => (prev && (voices || []).some((v) => v.id === prev)) ? prev : '');
+      setVoiceModel((prev) => (prev && (voices || []).some((v: any) => v.id === prev)) ? prev : '');
+      setTrainedLoras(loras || []);
+      // Drop a saved LoRA pick if it's no longer present in models/loras/.
+      setTrainedLoraName((prev) => (prev && (loras || []).some((l: any) => l.id === prev)) ? prev : '');
     }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
   useEffect(() => { localStorage.setItem('ace-voiceModel', voiceModel || ''); }, [voiceModel]);
+  useEffect(() => { localStorage.setItem('ace-trainedLora', trainedLoraName || ''); }, [trainedLoraName]);
 
   // Transcribe state — Phase 1 of Transform panel wiring. `transcribePicker`
   // controls the SourceAudioPicker modal; `transcribing` shows a spinner on
@@ -1215,6 +1223,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         })(),
         isFormatCaption,
         loraLoaded,
+        // Trained LoRA — only forward when the user picked one AND ticked
+        // "Use LoRA". Backend graph stays bit-identical to pre-Phase-19
+        // when these are undefined.
+        loraName: (loraEnabled && trainedLoraName) ? trainedLoraName : undefined,
+        loraStrength: (loraEnabled && trainedLoraName) ? loraScale : undefined,
       });
     }
 
@@ -2057,7 +2070,39 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
                 {/* LoRA Path Input */}
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('loraPath')}</label>
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Trained LoRA</label>
+                  {/* Task #19 — pick a LoRA the user trained via the Training
+                      page. Catalogue is hydrated from /api/models which
+                      queries ComfyUI's LoraLoaderModelOnly dropdown so a
+                      freshly-exported LoRA appears immediately on next
+                      render. Selecting an entry sets the legacy loraPath
+                      input so the existing Load button still works as a
+                      fallback for raw-path users. */}
+                  <select
+                    value={trainedLoraName}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setTrainedLoraName(v);
+                      if (v) {
+                        setLoraPath(v);
+                        setLoraEnabled(true);
+                      }
+                    }}
+                    className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
+                  >
+                    <option value="">No LoRA (raw model)</option>
+                    {trainedLoras.map((l) => (
+                      <option key={l.id} value={l.id}>{l.label || l.file}</option>
+                    ))}
+                  </select>
+                  {trainedLoras.length === 0 && (
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                      No trained LoRAs yet — visit the Training page to build one.
+                    </p>
+                  )}
+                  <label className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 mt-2 block">
+                    Or paste a raw path / filename (advanced)
+                  </label>
                   <input
                     type="text"
                     value={loraPath}

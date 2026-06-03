@@ -605,6 +605,12 @@ export interface GenerationParams {
   completeTrackClasses?: string[];
   isFormatCaption?: boolean;
   loraLoaded?: boolean;
+  // Trained LoRA picker (Task #19) — `loraName` is the .safetensors filename
+  // listed in modelsApi.list().loras; `loraStrength` is the slider value.
+  // Backend splices a LoraLoaderModelOnly node into the text2music graph
+  // when `loraName` is non-empty.
+  loraName?: string | null;
+  loraStrength?: number;
 }
 
 export interface GenerationJob {
@@ -695,6 +701,10 @@ function toBackendBody(p: GenerationParams) {
     trackName: p.trackName?.trim() || undefined,
     completeTrackClasses: Array.isArray(p.completeTrackClasses) && p.completeTrackClasses.length
       ? p.completeTrackClasses : undefined,
+    // Trained LoRA forwarded only when the user actually selected one — the
+    // backend graph is bit-identical to pre-Phase-19 when this is undefined.
+    loraName: p.loraName?.trim() || undefined,
+    loraStrength: typeof p.loraStrength === 'number' ? p.loraStrength : undefined,
   };
 }
 
@@ -1049,29 +1059,143 @@ export function getTrainingAudioUrl(audioPath: unknown, token?: string): string 
   return undefined;
 }
 
-// LoRA fine-tuning isn't supported on this deployment — every method below
-// rejects with the same error so the Training tab degrades to "unavailable"
-// rather than throwing arbitrary fetch failures.
-const TRAINING_UNAVAILABLE = () => Promise.reject(new Error('Training is not available on this deployment.'));
+// Track of the most recent dataset + train/preprocess job ids the panel
+// kicked off, so the UI handlers that don't pass them through (stop /
+// auto-label / save) can still target the right backend resource.
+let _activeDatasetId: number | null = null;
+let _activeTrainJobId: number | null = null;
+let _activePreprocessJobId: number | null = null;
+
+async function uploadMultipart<T>(endpoint: string, formData: FormData): Promise<T> {
+  const tok = (await firebaseAuth.currentUser?.getIdToken()) ?? null;
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers: tok ? { Authorization: `Bearer ${tok}` } : undefined,
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `${endpoint} failed` }));
+    throw new Error(`${res.status}: ${err.error || endpoint}`);
+  }
+  return res.json();
+}
 
 export const trainingApi = {
-  uploadAudio: (_files: File[], _ds: string, _t: string) => TRAINING_UNAVAILABLE() as Promise<any>,
+  // ---------------- Model Configuration section ----------------
+  getCheckpoints: async (_t?: string) => api('/api/training/checkpoints'),
+  getLoraCheckpoints: async (_t?: string) => api('/api/training/lora-checkpoints'),
+  initModel: async (body: any, _t?: string) =>
+    api('/api/training/init', { method: 'POST', body }),
 
-  buildDataset:       (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  scanDirectory:      (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  autoLabel:          (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  initModel:          (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  getCheckpoints:     (..._a: unknown[]) => Promise.resolve({ checkpoints: [], configs: [] }),
-  getLoraCheckpoints: (..._a: unknown[]) => Promise.resolve({ checkpoints: [], outputDir: '' }),
-  preprocess:         (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  loadDataset:        (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  getSamplePreview:   (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  saveSample:         (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  updateSettings:     (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  saveDataset:        (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  loadTensors:        (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  startTraining:      (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  stopTraining:       (..._a: unknown[]) => Promise.resolve({ status: 'idle' }),
-  exportLora:         (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
-  importDataset:      (..._a: unknown[]) => TRAINING_UNAVAILABLE() as Promise<any>,
+  // ---------------- Dataset Builder tab -----------------------
+  uploadAudio: async (files: File[], datasetName: string, _t?: string) => {
+    const fd = new FormData();
+    fd.append('datasetName', datasetName);
+    for (const f of files) fd.append('files', f);
+    return uploadMultipart('/api/training/upload', fd);
+  },
+  buildDataset: async (body: any, _t?: string) => {
+    const r: any = await api('/api/training/datasets/build', { method: 'POST', body });
+    if (r?.datasetId) _activeDatasetId = r.datasetId;
+    return r;
+  },
+  scanDirectory: async (body: any, _t?: string) => {
+    const r: any = await api('/api/training/scan', { method: 'POST', body });
+    if (r?.datasetId) _activeDatasetId = r.datasetId;
+    return r;
+  },
+  loadDataset: async (datasetPath: string, _t?: string) => {
+    const r: any = await api('/api/training/datasets/load', {
+      method: 'POST', body: { datasetPath },
+    });
+    if (r?.datasetId) _activeDatasetId = r.datasetId;
+    return r;
+  },
+  getSamplePreview: async (idx: number, _t?: string) => {
+    const dsId = _activeDatasetId;
+    if (!dsId) throw new Error('No dataset loaded');
+    const r: any = await api(`/api/training/datasets/${dsId}/samples/${idx}`);
+    return r.sample;
+  },
+  saveSample: async (body: any, _t?: string) => {
+    const dsId = body.datasetId ?? _activeDatasetId;
+    if (!dsId) throw new Error('No dataset loaded');
+    const { idx, ...rest } = body;
+    return api(`/api/training/datasets/${dsId}/samples/${idx}`, { method: 'PATCH', body: rest });
+  },
+  updateSettings: async (settings: any, _t?: string) => {
+    const dsId = settings.datasetId ?? _activeDatasetId;
+    if (!dsId) throw new Error('No dataset loaded');
+    return api(`/api/training/datasets/${dsId}/settings`, { method: 'PUT', body: settings });
+  },
+  saveDataset: async (body: any, _t?: string) =>
+    api('/api/training/datasets/save', {
+      method: 'POST',
+      body: { datasetId: _activeDatasetId, ...body },
+    }),
+
+  // ---------------- Auto-label (Phase 19.x — not yet wired) ----
+  autoLabel: async (_body: any, _t?: string) => {
+    // Backend route /api/training/auto-label is a follow-up; for now we
+    // surface a clear message so the button reports honestly.
+    throw new Error('Auto-label is not implemented yet — fill tags + lyrics manually for now.');
+  },
+
+  // ---------------- Train LoRA tab ----------------------------
+  preprocess: async (body: any, _t?: string) => {
+    const r: any = await api('/api/training/jobs/preprocess', {
+      method: 'POST', body: { datasetId: _activeDatasetId, ...body },
+    });
+    if (r?.jobId) _activePreprocessJobId = r.jobId;
+    return r;
+  },
+  loadTensors: async (tensorDir: string, _t?: string) =>
+    api('/api/training/tensors/load', { method: 'POST', body: { tensorDir } }),
+  startTraining: async (body: any, _t?: string) => {
+    const r: any = await api('/api/training/jobs/train', {
+      method: 'POST', body: { datasetId: _activeDatasetId, ...body },
+    });
+    if (r?.jobId) _activeTrainJobId = r.jobId;
+    return r;
+  },
+  stopTraining: async (_t?: string) => {
+    const id = _activeTrainJobId;
+    if (!id) return { status: 'idle' };
+    return api(`/api/training/jobs/${id}/cancel`, { method: 'POST' });
+  },
+  // Frontend polls this every few seconds while training is in flight.
+  getActiveJob: async () => {
+    const id = _activeTrainJobId || _activePreprocessJobId;
+    if (!id) return null;
+    return api(`/api/training/jobs/${id}`);
+  },
+
+  // ---------------- Export tab --------------------------------
+  exportLora: async (body: any, _t?: string) => {
+    const id = body.jobId ?? _activeTrainJobId;
+    if (!id) throw new Error('No training job to export — finish a training run first.');
+    return api(`/api/training/jobs/${id}/export`, {
+      method: 'POST', body: { outputDir: body.outputDir },
+    });
+  },
+  listJobs: async (status?: string, kind?: string) => {
+    const q = new URLSearchParams();
+    if (status) q.set('status', status);
+    if (kind)   q.set('kind', kind);
+    return api(`/api/training/jobs${q.toString() ? `?${q}` : ''}`);
+  },
+
+  // ---------------- Import (Phase 19.x — not yet wired) -------
+  importDataset: async (_file: File, _datasetName: string, _t?: string) => {
+    throw new Error('Import dataset JSON is not implemented yet — use Upload Audio instead.');
+  },
 };
+
+// Surface the active-job ids so the UI can poll without re-tracking them.
+export function getActiveTrainingIds() {
+  return {
+    datasetId: _activeDatasetId,
+    trainJobId: _activeTrainJobId,
+    preprocessJobId: _activePreprocessJobId,
+  };
+}
