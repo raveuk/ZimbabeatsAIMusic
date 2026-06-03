@@ -1211,3 +1211,12 @@ export function getActiveTrainingIds() {
     preprocessJobId: _activePreprocessJobId,
   };
 }
+
+// Re-prime the module-level tracker after a page reload. TrainingPanel
+// resume-polling calls this once it discovers a running train job via
+// listJobs(); without it, the poll loop would keep returning null.
+export function setActiveTrainingIds(ids: { datasetId?: number | null; trainJobId?: number | null; preprocessJobId?: number | null }) {
+  if (ids.datasetId !== undefined)        _activeDatasetId        = ids.datasetId;
+  if (ids.trainJobId !== undefined)       _activeTrainJobId       = ids.trainJobId;
+  if (ids.preprocessJobId !== undefined)  _activePreprocessJobId  = ids.preprocessJobId;
+}

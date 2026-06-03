@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { trainingApi, getTrainingAudioUrl, TrainingSample, DatasetSettings } from '../services/api';
+import { trainingApi, getTrainingAudioUrl, setActiveTrainingIds, API_BASE, TrainingSample, DatasetSettings } from '../services/api';
 
 type TrainingTab = 'dataset' | 'train' | 'export';
 
@@ -222,6 +222,37 @@ export const TrainingPanel: React.FC = () => {
       }
     }).catch(() => { /* ignore */ });
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Resume polling after a page reload — `getActiveJob` is gated on the
+  // module-level `_activeTrainJobId` in services/api.ts which is wiped on
+  // refresh, so the spinner would disappear while the trainer keeps
+  // running on the backend. Find any of the user's RUNNING train jobs
+  // here and re-attach the poll loop by flipping isTraining true.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r: any = await trainingApi.listJobs?.('running', 'train');
+        const job = r?.jobs?.[0];
+        if (cancelled || !job) return;
+        // Re-prime the module's active-job tracker so the poll effect
+        // (keyed on isTraining) can find this job by id.
+        setActiveTrainingIds({ trainJobId: job.id, datasetId: job.datasetId ?? null });
+        setIsTraining(true);
+        setTrainingProgress(`Re-attached to running job #${job.id} — ${job.status}`);
+        if (job.totalSteps > 0) {
+          setTrainingMetrics({
+            currentStep: job.currentStep,
+            totalSteps: job.totalSteps,
+            lastLoss: job.lastLoss,
+            percent: job.percent,
+          } as any);
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
 
   // === Model init ===
   const handleRefreshCheckpoints = useCallback(async () => {
