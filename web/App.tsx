@@ -768,12 +768,23 @@ function AppContent() {
     if (!token) return;
     if (activeJobsRef.current.has(jobId)) return;
 
+    // Track consecutive poll failures so a single network blip doesn't
+    // immediately drop the temp song from the UI.
+    let consecutiveErrors = 0;
     const pollInterval = setInterval(async () => {
       try {
         const status = await generateApi.getStatus(jobId, token);
-        const normalizedProgress = Number.isFinite(Number(status.progress))
-          ? (Number(status.progress) > 1 ? Number(status.progress) / 100 : Number(status.progress))
-          : undefined;
+        consecutiveErrors = 0;
+        // status.progress is t.progress?.percent — a NUMBER (0-100) or
+        // null/undefined. Treat null/undefined as "no progress yet" and
+        // KEEP the previous value. Number(null) is 0 (subtle), so we
+        // must guard with == null explicitly.
+        const rawProgress = status.progress;
+        const normalizedProgress = (rawProgress == null)
+          ? undefined
+          : (Number.isFinite(Number(rawProgress))
+              ? (Number(rawProgress) > 1 ? Number(rawProgress) / 100 : Number(rawProgress))
+              : undefined);
 
         setSongs(prev => {
           const song = prev.find(s => s.id === tempId);
@@ -791,7 +802,13 @@ function AppContent() {
           });
         });
 
-        if (status.status === 'succeeded' && status.result) {
+        // Trigger cleanup + refresh as soon as the backend reports done,
+        // even if `result` (audioUrl) isn't materialised yet — that field
+        // can lag by 1-2s between status='done' and refreshTrack writing
+        // the filename row. If we wait for it, the temp song stays in
+        // limbo and the workspace doesn't update. The next refresh tick
+        // (per-job + the 10s safety net) brings the real audioUrl in.
+        if (status.status === 'succeeded') {
           cleanupJob(jobId, tempId);
           await refreshSongsList();
 
@@ -804,8 +821,14 @@ function AppContent() {
           showToast(`${t('generationFailed')}: ${status.error || 'Unknown error'}`, 'error');
         }
       } catch (pollError) {
-        console.error(`Polling error for job ${jobId}:`, pollError);
-        cleanupJob(jobId, tempId);
+        consecutiveErrors += 1;
+        console.warn(`Polling error for job ${jobId} (${consecutiveErrors}):`, pollError);
+        // Only nuke the temp after several consecutive failures — a
+        // single network blip used to drop the temp song instantly.
+        if (consecutiveErrors >= 5) {
+          console.error(`Job ${jobId} failed after ${consecutiveErrors} poll errors`);
+          cleanupJob(jobId, tempId);
+        }
       }
     }, 2000);
 
