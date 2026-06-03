@@ -667,17 +667,6 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentSong, songs]);
 
-  // Belt-and-braces: while any generation is in flight, periodically
-  // refresh the songs list so the workspace shows newly-completed tracks
-  // (and their real covers) even when the per-job success callback misses
-  // — e.g. background tab throttling, network blip, or a job whose ws
-  // progress arrived but whose "succeeded" event we dropped.
-  useEffect(() => {
-    if (!isGenerating || !token) return;
-    const id = setInterval(() => { refreshSongsList(); }, 10_000);
-    return () => clearInterval(id);
-  }, [isGenerating, token, refreshSongsList]);
-
   // Helper to cleanup a job and check if all jobs are done
   const cleanupJob = useCallback((jobId: string, tempId: string) => {
     const jobData = activeJobsRef.current.get(jobId);
@@ -761,6 +750,19 @@ function AppContent() {
       console.error('Failed to refresh songs:', error);
     }
   }, [token]);
+
+  // Belt-and-braces: while any generation is in flight, periodically
+  // refresh the songs list so the workspace shows newly-completed tracks
+  // (and their real covers) even when the per-job success callback misses
+  // — e.g. background tab throttling, network blip, or a job whose ws
+  // progress arrived but whose "succeeded" event we dropped. Placed AFTER
+  // refreshSongsList's declaration so it doesn't hit the temporal-dead-zone
+  // ReferenceError that bricked production for ~5 minutes (commit 40893d1).
+  useEffect(() => {
+    if (!isGenerating || !token) return;
+    const id = setInterval(() => { refreshSongsList(); }, 10_000);
+    return () => clearInterval(id);
+  }, [isGenerating, token, refreshSongsList]);
 
   const beginPollingJob = useCallback((jobId: string, tempId: string) => {
     if (!token) return;
