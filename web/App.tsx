@@ -320,7 +320,11 @@ function AppContent() {
           title: s.title,
           lyrics: s.lyrics,
           style: s.style,
-          coverUrl: `https://picsum.photos/seed/${s.id}/400/400`,
+          // Real cover from /api/cover/[id] (pre-signed by services/api.ts);
+          // picsum placeholder is a last resort while the cover is still
+          // generating server-side (cover_url is undefined for ~5-8s after
+          // the audio finishes but before the cover prompt does).
+          coverUrl: s.cover_url || `https://picsum.photos/seed/${s.id}/400/400`,
           duration: s.duration && s.duration > 0 ? `${Math.floor(s.duration / 60)}:${String(Math.floor(s.duration % 60)).padStart(2, '0')}` : '0:00',
           createdAt: new Date(s.created_at || s.createdAt),
           tags: s.tags || [],
@@ -663,6 +667,17 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentSong, songs]);
 
+  // Belt-and-braces: while any generation is in flight, periodically
+  // refresh the songs list so the workspace shows newly-completed tracks
+  // (and their real covers) even when the per-job success callback misses
+  // — e.g. background tab throttling, network blip, or a job whose ws
+  // progress arrived but whose "succeeded" event we dropped.
+  useEffect(() => {
+    if (!isGenerating || !token) return;
+    const id = setInterval(() => { refreshSongsList(); }, 10_000);
+    return () => clearInterval(id);
+  }, [isGenerating, token, refreshSongsList]);
+
   // Helper to cleanup a job and check if all jobs are done
   const cleanupJob = useCallback((jobId: string, tempId: string) => {
     const jobData = activeJobsRef.current.get(jobId);
@@ -693,7 +708,10 @@ function AppContent() {
         title: s.title,
         lyrics: s.lyrics,
         style: s.style,
-        coverUrl: `https://picsum.photos/seed/${s.id}/400/400`,
+        // Real cover from /api/cover/[id] (pre-signed by services/api.ts);
+        // picsum placeholder only if cover isn't ready yet (rare 5-8s window
+        // between audio-done and cover-done).
+        coverUrl: s.cover_url || `https://picsum.photos/seed/${s.id}/400/400`,
         duration: s.duration && s.duration > 0 ? `${Math.floor(s.duration / 60)}:${String(Math.floor(s.duration % 60)).padStart(2, '0')}` : '0:00',
         createdAt: new Date(s.created_at),
         tags: s.tags || [],
