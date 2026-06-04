@@ -2,10 +2,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  getRedirectResult,
   onIdTokenChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from 'firebase/auth';
 import { authApi, User, _setCurrentUserForSongMapper, _setCurrentTokenForSongMapper } from '../services/api';
@@ -23,6 +24,14 @@ import { auth as firebaseAuth } from '../services/firebase';
 //     signup. The auth UI is replaced with an email+password modal.
 //     The compatibility stub still exists so legacy modal code that calls
 //     setupUser() doesn't crash.
+//
+// Google sign-in uses signInWithRedirect (not signInWithPopup) because our
+// Cloudflare Pages headers set `Cross-Origin-Opener-Policy: same-origin` for
+// FFmpeg.wasm SharedArrayBuffer support, and that severs window.opener
+// between the OAuth popup and the host tab → signInWithPopup fails with
+// auth/popup-closed-by-user. Redirect-based flow side-steps the popup
+// entirely; getRedirectResult below picks up the credential on the next page
+// load.
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -84,6 +93,21 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     return () => unsub();
   }, []);
 
+  // Drain any pending OAuth redirect result on mount. Firebase parks the
+  // credential in sessionStorage during the round-trip to accounts.google.com
+  // and back; getRedirectResult resolves it, then onIdTokenChanged fires with
+  // the new fbUser and the rest of the auth flow runs as normal. We swallow
+  // errors silently — the most common case (no pending redirect) is not a
+  // real error and would scare users on every page load.
+  useEffect(() => {
+    getRedirectResult(firebaseAuth).catch((err) => {
+      // Only surface unexpected failures; "no pending redirect" is null/undefined return
+      if (err?.code && err.code !== 'auth/no-auth-event') {
+        console.error('Google redirect sign-in failed:', err);
+      }
+    });
+  }, []);
+
   const refreshUser = useCallback(async (): Promise<void> => {
     if (!firebaseAuth.currentUser) return;
     try {
@@ -108,7 +132,10 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
   }, []);
 
   const signInWithGoogle = useCallback(async (): Promise<void> => {
-    await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
+    // Full-page redirect to accounts.google.com. After consent Google sends
+    // the browser back to this origin; getRedirectResult (above) picks up
+    // the credential, then onIdTokenChanged completes the sign-in.
+    await signInWithRedirect(firebaseAuth, new GoogleAuthProvider());
   }, []);
 
   const sendPasswordReset = useCallback(async (email: string): Promise<void> => {
