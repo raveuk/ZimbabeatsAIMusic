@@ -6,6 +6,7 @@ import {
   onIdTokenChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signInWithRedirect,
   signOut,
 } from 'firebase/auth';
@@ -100,12 +101,18 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
   // errors silently — the most common case (no pending redirect) is not a
   // real error and would scare users on every page load.
   useEffect(() => {
-    getRedirectResult(firebaseAuth).catch((err) => {
-      // Only surface unexpected failures; "no pending redirect" is null/undefined return
-      if (err?.code && err.code !== 'auth/no-auth-event') {
-        console.error('Google redirect sign-in failed:', err);
-      }
-    });
+    // Drain any pending redirect-based sign-in. Logs the result so we can
+    // see in DevTools whether the redirect bounce delivered a credential,
+    // returned null (no pending redirect), or surfaced an error.
+    getRedirectResult(firebaseAuth)
+      .then((result) => {
+        if (result) {
+          console.log('[auth] redirect sign-in succeeded for', result.user?.email);
+        }
+      })
+      .catch((err) => {
+        console.error('[auth] getRedirectResult error:', err?.code, err?.message, err);
+      });
   }, []);
 
   const refreshUser = useCallback(async (): Promise<void> => {
@@ -132,10 +139,27 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
   }, []);
 
   const signInWithGoogle = useCallback(async (): Promise<void> => {
-    // Full-page redirect to accounts.google.com. After consent Google sends
-    // the browser back to this origin; getRedirectResult (above) picks up
-    // the credential, then onIdTokenChanged completes the sign-in.
-    await signInWithRedirect(firebaseAuth, new GoogleAuthProvider());
+    // Prefer popup — postMessage-based, no sessionStorage round-trip, no
+    // page reload, fewer ways for browser storage/tracking-protection
+    // settings to silently break the handoff. Fall back to redirect if the
+    // popup is blocked (mobile Safari, popup blockers, etc).
+    try {
+      await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
+    } catch (err: any) {
+      const code = err?.code;
+      if (
+        code === 'auth/popup-blocked' ||
+        code === 'auth/popup-closed-by-user' ||
+        code === 'auth/cancelled-popup-request' ||
+        code === 'auth/operation-not-supported-in-this-environment'
+      ) {
+        // Fall back to full-page redirect. getRedirectResult on the next
+        // mount picks up the credential.
+        await signInWithRedirect(firebaseAuth, new GoogleAuthProvider());
+        return;
+      }
+      throw err;
+    }
   }, []);
 
   const sendPasswordReset = useCallback(async (email: string): Promise<void> => {
