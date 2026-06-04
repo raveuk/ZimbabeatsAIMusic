@@ -1,15 +1,14 @@
 # Cloudflare Pages static-header rules.
 #
-# FFmpeg.wasm (used by the in-browser Create Video modal) needs
-# SharedArrayBuffer, which the browser only exposes when the page is
-# "cross-origin isolated". That requires both COOP and COEP set.
+# We previously set Cross-Origin-Opener-Policy: same-origin +
+# Cross-Origin-Embedder-Policy: credentialless to enable SharedArrayBuffer
+# for FFmpeg.wasm inside the legacy in-browser Create Video modal.
+# Those headers turned out to break Firebase Auth — the auth iframe at
+# https://<project>.firebaseapp.com/__/auth/iframe doesn't ship COEP
+# headers, so the embedder policy blocked it with NS_ERROR_DOM_COEP_FAILED,
+# which killed BOTH signInWithPopup and signInWithRedirect.
 #
-# We use COEP: credentialless instead of require-corp so cross-origin
-# resources (Firebase Auth iframe, picsum fallback, api.zimbabeats.com
-# audio/cover responses, etc.) still load — they're just fetched without
-# credentials. The Cloudflare Tunnel responses we own all set CORS
-# explicitly so the only places this could surface as a regression are
-# embeds from origins we don't control, which the app doesn't load.
-/*
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: credentialless
+# In-browser video encoding is no longer the primary path — the AI Video
+# panel renders server-side via Wan 2.2 S2V — so we trade FFmpeg.wasm for
+# working sign-in. Leave this file empty (Cloudflare Pages still serves it,
+# just with no header overrides) so the auth iframe loads cleanly.
