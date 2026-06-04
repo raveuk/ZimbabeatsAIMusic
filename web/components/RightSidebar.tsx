@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Song } from '../types';
 import { Heart, Share2, Play, Pause, MoreHorizontal, X, Copy, Wand2, MoreVertical, Download, Repeat, Video, Music, Link as LinkIcon, Sparkles, Globe, Lock, Trash2, Edit3, Layers } from 'lucide-react';
 import { songsApi } from '../services/api';
+import { openAudioEditor } from '../services/editor';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
@@ -299,11 +300,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                             <Video size={18} strokeWidth={1.5} />
                         </button>
                         <button
-                            onClick={() => {
-                                if (!song?.audioUrl) return;
-                                const audioUrl = song.audioUrl.startsWith('http') ? song.audioUrl : `${window.location.origin}${song.audioUrl}`;
-                                window.open(`/editor?audioUrl=${encodeURIComponent(audioUrl)}`, '_blank');
-                            }}
+                            onClick={() => { if (song) void openAudioEditor(song); }}
                             title={t('openInEditor')}
                             className="p-3 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-300/50 dark:hover:bg-white/10 rounded-xl transition-all duration-200"
                         >

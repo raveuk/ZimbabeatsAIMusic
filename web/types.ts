@@ -152,4 +152,4 @@ export interface UserProfile {
 }
 
 // Simplified views for Myuzika
-export type View = 'create' | 'library' | 'training' | 'profile' | 'song' | 'playlist' | 'search' | 'news';
+export type View = 'create' | 'library' | 'training' | 'musicvideo' | 'profile' | 'song' | 'playlist' | 'search' | 'news';

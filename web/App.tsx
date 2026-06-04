@@ -21,6 +21,7 @@ import { PlaylistDetail } from './components/PlaylistDetail';
 import { Toast, ToastType } from './components/Toast';
 import { SearchPage } from './components/SearchPage';
 import { TrainingPanel } from './components/TrainingPanel';
+import MusicVideoPanel from './components/MusicVideoPanel';
 import { NewsPage } from './components/NewsPage';
 import { ConfirmDialog } from './components/ConfirmDialog';
 
@@ -764,6 +765,33 @@ function AppContent() {
     return () => clearInterval(id);
   }, [isGenerating, token, refreshSongsList]);
 
+  // AudioMass tab posts back when the user clicks Save / Save As — pull a
+  // fresh song list so the player picks up the new audio URL.
+  useEffect(() => {
+    const onMsg = (ev: MessageEvent) => {
+      const data: any = ev.data;
+      if (!data || data.type !== 'myuzika:audiomass-saved') return;
+      refreshSongsList();
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [refreshSongsList]);
+
+  // openAudioEditor (services/editor.ts) dispatches 'myuzika:toast' events
+  // while it runs Demucs in the background — surface them on the shared
+  // Toast so the user sees "Extracting stems…" / "Stems ready" instead of
+  // a silent 30-60 s hang.
+  useEffect(() => {
+    const onToast = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail || {};
+      if (typeof detail.message === 'string') {
+        showToast(detail.message, (detail.type as ToastType) || 'info');
+      }
+    };
+    window.addEventListener('myuzika:toast', onToast);
+    return () => window.removeEventListener('myuzika:toast', onToast);
+  }, []);
+
   const beginPollingJob = useCallback((jobId: string, tempId: string) => {
     if (!token) return;
     if (activeJobsRef.current.has(jobId)) return;
@@ -1412,6 +1440,9 @@ function AppContent() {
 
       case 'training':
         return <TrainingPanel />;
+
+      case 'musicvideo':
+        return <MusicVideoPanel songs={songs} token={token} />;
 
       case 'news':
         return <NewsPage />;

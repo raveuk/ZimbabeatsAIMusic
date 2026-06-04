@@ -133,3 +133,28 @@ db.exec(`
 `);
 // Per-user LoRA quota — NULL = unlimited, mirrors track_quota.
 if (!userCols.includes("lora_quota")) db.exec("ALTER TABLE users ADD COLUMN lora_quota INTEGER");
+
+// ---------------------------------------------------------------------------
+// AI music videos (Task #32) — Wan 2.2 S2V generates video synced to one of
+// the user's tracks. Each row is one render job: ties an existing track and a
+// staged reference-image upload, records the ComfyUI prompt_id while running,
+// and the saved MP4 filename once done.
+// ---------------------------------------------------------------------------
+db.exec(`
+  CREATE TABLE IF NOT EXISTS music_videos (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    track_id        INTEGER REFERENCES tracks(id) ON DELETE SET NULL,
+    image_upload_id INTEGER REFERENCES uploads(id) ON DELETE SET NULL,
+    prompt_id       TEXT,
+    status          TEXT NOT NULL DEFAULT 'queued',
+    style_prompt    TEXT,
+    params_json     TEXT,
+    filename        TEXT,
+    subfolder       TEXT,
+    error_message   TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+// users.musicvideo_quota — NULL = unlimited, mirrors track_quota.
+if (!userCols.includes("musicvideo_quota")) db.exec("ALTER TABLE users ADD COLUMN musicvideo_quota INTEGER");

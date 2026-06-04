@@ -12,6 +12,7 @@ web-build/
 # specifically. web/data/ ships static config (genres.ts, news.json) that the
 # Vite build needs.
 server/data/
+/data/
 **/jwt.secret
 
 # Editor/OS junk

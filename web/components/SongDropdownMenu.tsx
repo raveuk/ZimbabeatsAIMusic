@@ -3,6 +3,7 @@ import { Song } from '../types';
 import { useI18n } from '../context/I18nContext';
 import { StemsModal } from './StemsModal';
 import { lrcApi } from '../services/api';
+import { openAudioEditor } from '../services/editor';
 import {
     Video,
     Edit3,
@@ -141,14 +142,13 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
         onClose();
     };
 
-    // Fallback when no `onEditAudio` prop is wired. The legacy
-    // `window.open('/editor?…')` target never existed, so we now dispatch
-    // a CustomEvent that App.tsx listens for — it routes to the Create
-    // panel with task_type='edit' + the song pre-loaded as source.
-    const handleEditAudio = () => {
-        if (!song?.id) return;
-        window.dispatchEvent(new CustomEvent('myuzika:edit-audio', { detail: { song } }));
+    // Open the song in AudioMass (the in-browser waveform editor served from
+    // /audiomass/). The patched welcome.js / app.js autoloads the audio when
+    // ?audio= is present; the myuzika-bridge script wires Save / Save As when
+    // ?track= and ?token= are present.
+    const handleEditAudio = async () => {
         onClose();
+        await openAudioEditor(song);
     };
 
     // StemsModal open flag is at component scope below (above the early

@@ -190,6 +190,57 @@ const STEMS_SAVE_NODES = {
 export function stemsAvailable() { return !!STEMS_TEMPLATE; }
 
 // ---------------------------------------------------------------------------
+// Music video (Task #32) — Wan 2.2 S2V generates a video synced to one of
+// the user's tracks + a reference image of the singer. The workflow JSON was
+// converted from the user's existing ComfyUI workflow "video Music AI.json"
+// (see server/workflow.musicvideo.api.json). Patch points:
+//   #52 LoadImage.image  ← reference image filename in ComfyUI/input/
+//   #58 LoadAudio.audio  ← the track's audio filename
+//   #6  CLIPTextEncode.text  ← style/scene prompt
+//   #93 WanSoundImageToVideo.{width,height,length}  ← output dims + frame count
+//   #82 CreateVideo.fps  ← frames per second of output
+//   #3  KSampler.seed  ← randomised per request
+//   #113 SaveVideo.filename_prefix  ← per-user/video output path
+// ---------------------------------------------------------------------------
+const MUSICVIDEO_TEMPLATE = loadTemplate("workflow.musicvideo.api.json");
+const MV_LOAD_IMAGE_NODE  = "52";
+const MV_LOAD_AUDIO_NODE  = "58";
+const MV_POSITIVE_NODE    = "6";
+const MV_WANS2V_NODE      = "93";
+const MV_CREATEVIDEO_NODE = "82";
+const MV_KSAMPLER_NODE    = "3";
+const MV_SAVE_NODE        = "113";
+export function musicVideoAvailable() { return !!MUSICVIDEO_TEMPLATE; }
+
+export function buildMusicVideoGraph(input) {
+  if (!MUSICVIDEO_TEMPLATE) return null;
+  if (!input.audioInputFile) throw new Error("music video graph requires audioInputFile");
+  if (!input.imageInputFile) throw new Error("music video graph requires imageInputFile");
+
+  const g = structuredClone(MUSICVIDEO_TEMPLATE);
+  const seed = Number.isInteger(input.seed) && input.seed >= 0
+    ? input.seed : Math.floor(Math.random() * 2 ** 31);
+
+  g[MV_LOAD_IMAGE_NODE].inputs.image = String(input.imageInputFile);
+  g[MV_LOAD_AUDIO_NODE].inputs.audio = String(input.audioInputFile);
+  if (input.positivePrompt) g[MV_POSITIVE_NODE].inputs.text = String(input.positivePrompt);
+
+  // length is FRAMES — Wan uses 16 fps as the natural rate. Clamp to a
+  // sensible range so users can't accidentally request 30 minutes of video.
+  // 77 frames ≈ 4.8 s, 161 ≈ 10 s, 241 ≈ 15 s.
+  const length = clamp(Number(input.lengthFrames) || 77, 16, 241);
+  if (g[MV_WANS2V_NODE]) {
+    if (input.width)  g[MV_WANS2V_NODE].inputs.width  = clamp(Number(input.width),  256, 1280);
+    if (input.height) g[MV_WANS2V_NODE].inputs.height = clamp(Number(input.height), 256, 1280);
+    g[MV_WANS2V_NODE].inputs.length = length;
+  }
+  if (g[MV_CREATEVIDEO_NODE] && input.fps) g[MV_CREATEVIDEO_NODE].inputs.fps = clamp(Number(input.fps), 8, 60);
+  if (g[MV_KSAMPLER_NODE]) g[MV_KSAMPLER_NODE].inputs.seed = seed;
+  g[MV_SAVE_NODE].inputs.filename_prefix = input.filenamePrefix || "music_app/musicvideo";
+  return { graph: g, seed, lengthFrames: length };
+}
+
+// ---------------------------------------------------------------------------
 // Transcribe (Granite ASR via TTS-Audio-Suite). LoadAudio → engine → ASR →
 // PreviewAny capture nodes. We use PreviewAny to push the STRING outputs into
 // the prompt's history.outputs map; without it, transient STRING values never

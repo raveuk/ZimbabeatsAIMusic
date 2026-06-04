@@ -475,6 +475,61 @@ export const lrcApi = {
   },
 };
 
+// AI music-video API (Task #32) — generates a Wan 2.2 S2V video synced to one
+// of the user's tracks. Two-step flow:
+//   1. uploadImage(file) → returns an imageUploadId
+//   2. create({ trackId, imageUploadId, stylePrompt, length }) → returns videoId
+//   3. poll get(videoId) until status='done', then videoUrl is the MP4 stream.
+export interface MusicVideo {
+  id: number;
+  trackId: number | null;
+  trackTitle?: string | null;
+  imageUploadId?: number | null;
+  stylePrompt?: string | null;
+  status: 'queued' | 'running' | 'done' | 'error';
+  filename?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  videoUrl: string | null;
+  progress?: { percent?: number } | null;
+}
+export const musicVideoApi = {
+  uploadImage: async (file: File): Promise<{ uploadId: number; filename: string }> => {
+    const tok = (await firebaseAuth.currentUser?.getIdToken()) ?? null;
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`${API_BASE}/api/musicvideo/upload-image`, {
+      method: 'POST',
+      headers: tok ? { Authorization: `Bearer ${tok}` } : undefined,
+      body: fd,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'image upload failed' }));
+      throw new Error(`${res.status}: ${err.error || 'image upload failed'}`);
+    }
+    return res.json();
+  },
+  create: async (body: {
+    trackId: number;
+    imageUploadId: number;
+    stylePrompt: string;
+    length?: number;        // seconds (default 5)
+    width?: number; height?: number;
+  }): Promise<{ videoId: number; promptId: string; lengthFrames: number }> =>
+    api('/api/musicvideo', { method: 'POST', body }),
+  list: async (): Promise<{ videos: MusicVideo[] }> =>
+    api('/api/musicvideo'),
+  get: async (id: number | string): Promise<{ video: MusicVideo }> =>
+    api(`/api/musicvideo/${id}`),
+  remove: async (id: number | string): Promise<{ ok: true }> =>
+    api(`/api/musicvideo/${id}`, { method: 'DELETE' }),
+  fileUrl: (id: number | string): string => {
+    // Browser fetches /api/musicvideo/[id]/file with Bearer token via the
+    // signed-url helper below — see signed() at the call site.
+    return `${API_BASE}/api/musicvideo/${id}/file`;
+  },
+};
+
 // Upload staging API — backs the SourceAudioPicker that the Transform-panel
 // features (Transcribe, Cover, Repaint, Extend, Edit) consume. Files are
 // staged into ComfyUI's input/ folder so any LoadAudio-fed workflow can

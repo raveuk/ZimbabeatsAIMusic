@@ -39,6 +39,42 @@ export function sniffAudioExt(buf) {
 // Persist a byte buffer into ComfyUI/input/ under a random name, validate
 // magic bytes, and insert an uploads row. Returns { uploadId, filename }
 // where filename is the basename (LoadAudio takes just the name, not a path).
+// Magic-byte sniffer for image uploads. Returns the canonical extension
+// ('png', 'jpg', 'webp') or null. Used by /api/musicvideo/upload-image
+// to validate the reference picture the Wan 2.2 S2V workflow uses.
+export function sniffImageExt(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "png";
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpg";
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+      buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return "webp";
+  // GIF87a / GIF89a
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return "gif";
+  return null;
+}
+
+// Same job as stageBuffer for audio but for the reference image. We branch
+// because the magic-byte sniffer and the on-disk prefix differ.
+export function stageImageBuffer({ buf, userId, originalName = null, mime = null }) {
+  if (buf.length > MAX_BYTES) {
+    const err = new Error("image too large"); err.status = 413; throw err;
+  }
+  const ext = sniffImageExt(buf);
+  if (!ext) {
+    const err = new Error("unsupported image format (need png/jpg/webp/gif)");
+    err.status = 415; throw err;
+  }
+  const nonce = crypto.randomBytes(4).toString("hex");
+  const filename = `img_u${userId}_${nonce}.${ext}`;
+  const dest = path.join(INPUT_DIR, filename);
+  fs.writeFileSync(dest, buf);
+  const row = db.prepare(
+    `INSERT INTO uploads (user_id, filename, original_name, mime, size_bytes, source)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(userId, filename, originalName, mime, buf.length, "musicvideo-image");
+  return { uploadId: Number(row.lastInsertRowid), filename };
+}
+
 export function stageBuffer({ buf, userId, originalName = null, mime = null, source = "upload", trackId = null }) {
   if (buf.length > MAX_BYTES) {
     const err = new Error("file too large");

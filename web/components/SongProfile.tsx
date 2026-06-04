@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Song } from '../types';
 import { songsApi, getAudioUrl } from '../services/api';
+import { openAudioEditor } from '../services/editor';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { ArrowLeft, Play, Pause, Heart, Share2, MoreHorizontal, ThumbsDown, Music as MusicIcon, Edit3, Eye } from 'lucide-react';
@@ -269,11 +270,7 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
                             </button>
                             {user?.id === song.userId && (
                                 <button
-                                    onClick={() => {
-                                        if (!song.audioUrl) return;
-                                        const audioUrl = song.audioUrl.startsWith('http') ? song.audioUrl : `${window.location.origin}${song.audioUrl}`;
-                                        window.open(`/editor?audioUrl=${encodeURIComponent(audioUrl)}`, '_blank');
-                                    }}
+                                    onClick={() => { if (song) void openAudioEditor(song); }}
                                     className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded-full text-sm font-semibold transition-colors text-white"
                                 >
                                     <Edit3 size={16} />

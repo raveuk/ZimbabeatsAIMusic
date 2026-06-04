@@ -1,0 +1,147 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "_meta": { "title": "Load Wan 2.1 I2V 14B 480p" },
+    "inputs": {
+      "unet_name": "Wan2_1-I2V-14B-480p_bf16.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "2": {
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": { "title": "lightx2v 4-step distill" },
+    "inputs": {
+      "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "strength_model": 1.0,
+      "model": ["1", 0]
+    }
+  },
+  "3": {
+    "class_type": "ModelPatchLoader",
+    "_meta": { "title": "InfiniteTalk patch" },
+    "inputs": {
+      "name": "wan2.1_infiniteTalk_multi_fp16.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "CLIPLoader",
+    "_meta": { "title": "Load UMT5 XXL" },
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan"
+    }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Positive prompt" },
+    "inputs": {
+      "text": "cinematic music video, soft golden hour lighting, emotive performance",
+      "clip": ["4", 0]
+    }
+  },
+  "6": {
+    "class_type": "ConditioningZeroOut",
+    "_meta": { "title": "Negative (empty)" },
+    "inputs": {
+      "conditioning": ["5", 0]
+    }
+  },
+  "7": {
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load Wan 2.1 VAE" },
+    "inputs": {
+      "vae_name": "Wan2_1_VAE_bf16.safetensors"
+    }
+  },
+  "8": {
+    "class_type": "AudioEncoderLoader",
+    "_meta": { "title": "Load wav2vec2 English" },
+    "inputs": {
+      "audio_encoder_name": "wav2vec2_large_english_fp16.safetensors"
+    }
+  },
+  "9": {
+    "class_type": "LoadAudio",
+    "_meta": { "title": "Load track audio" },
+    "inputs": {
+      "audio": "smoke_mv_audio.mp3"
+    }
+  },
+  "10": {
+    "class_type": "AudioEncoderEncode",
+    "_meta": { "title": "Encode audio → phoneme features" },
+    "inputs": {
+      "audio_encoder": ["8", 0],
+      "audio": ["9", 0]
+    }
+  },
+  "11": {
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load reference image" },
+    "inputs": {
+      "image": "example.png"
+    }
+  },
+  "12": {
+    "class_type": "WanInfiniteTalkToVideo",
+    "_meta": { "title": "InfiniteTalk conditioning" },
+    "inputs": {
+      "mode": "single_speaker",
+      "model": ["2", 0],
+      "model_patch": ["3", 0],
+      "positive": ["5", 0],
+      "negative": ["6", 0],
+      "vae": ["7", 0],
+      "width": 512,
+      "height": 512,
+      "length": 81,
+      "audio_encoder_output_1": ["10", 0],
+      "motion_frame_count": 9,
+      "audio_scale": 1.0,
+      "start_image": ["11", 0]
+    }
+  },
+  "13": {
+    "class_type": "KSampler",
+    "_meta": { "title": "Sampler" },
+    "inputs": {
+      "model": ["12", 0],
+      "positive": ["12", 1],
+      "negative": ["12", 2],
+      "latent_image": ["12", 3],
+      "seed": 42,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0
+    }
+  },
+  "14": {
+    "class_type": "VAEDecode",
+    "_meta": { "title": "Decode latents to frames" },
+    "inputs": {
+      "samples": ["13", 0],
+      "vae": ["7", 0]
+    }
+  },
+  "15": {
+    "class_type": "CreateVideo",
+    "_meta": { "title": "Combine frames + audio" },
+    "inputs": {
+      "images": ["14", 0],
+      "audio": ["9", 0],
+      "fps": 25.0
+    }
+  },
+  "16": {
+    "class_type": "SaveVideo",
+    "_meta": { "title": "Save MP4" },
+    "inputs": {
+      "video": ["15", 0],
+      "filename_prefix": "music_app/musicvideo_it",
+      "format": "auto",
+      "codec": "auto"
+    }
+  }
+}

@@ -33,6 +33,25 @@ export function readOutputFile(subfolder, filename) {
   }
 }
 
+// Write bytes to output/<subfolder>/<filename> (creating <subfolder> if needed).
+// Same traversal guard as the read/delete helpers. Returns the absolute path
+// on success, null otherwise.
+export function writeOutputFile(subfolder, filename, buf) {
+  if (!filename) return null;
+  const dir = path.resolve(OUTPUT_DIR, subfolder || "");
+  if (dir !== OUTPUT_DIR && !dir.startsWith(OUTPUT_DIR + path.sep)) return null;
+  const target = path.resolve(dir, filename);
+  if (!target.startsWith(dir + path.sep)) return null;
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(target, buf);
+    return target;
+  } catch (e) {
+    console.error("Failed to write output file", target, e.message);
+    return null;
+  }
+}
+
 // Turn a user title into a filesystem-safe slug for the SaveAudioMP3 prefix.
 export function titleSlug(title) {
   return (title || "")
