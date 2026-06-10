@@ -3284,11 +3284,18 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         </div>
       )}
 
-      {/* Footer Create Button */}
-      <div className="p-4 mt-auto sticky bottom-0 bg-zinc-50/95 dark:bg-suno-panel/95 backdrop-blur-sm z-10 border-t border-zinc-200 dark:border-white/5 space-y-3">
+      {/* Footer Create Button — sticky at the bottom of the scroll container.
+          On mobile the global bottom tab bar (fixed bottom-0, z-40, height
+          h-14 ≈ 56px) was covering this button entirely because the sticky
+          parent's z-10 lost the stack. Lift to z-50 so it draws above the
+          tab bar, and offset by the tab-bar height + safe-area on phones so
+          the button SITS ABOVE the tab bar instead of underneath it.
+          Desktop keeps bottom-0 because the desktop layout has no fixed
+          bottom nav to clear. */}
+      <div className="p-4 mt-auto sticky bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 bg-zinc-50/95 dark:bg-suno-panel/95 backdrop-blur-sm z-50 border-t border-zinc-200 dark:border-white/5 space-y-3">
         <button
           onClick={handleGenerate}
-          className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110"
+          className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110 disabled:opacity-50"
           disabled={isGenerating || !isAuthenticated}
         >
           <Sparkles size={18} />
