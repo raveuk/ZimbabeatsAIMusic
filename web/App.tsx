@@ -25,6 +25,8 @@ import MusicVideoPanel from './components/MusicVideoPanel';
 import { NewsPage } from './components/NewsPage';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { LandingPage } from './components/LandingPage';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { MobileHeader } from './components/MobileHeader';
 
 
 function AppContent() {
@@ -1561,45 +1563,79 @@ function AppContent() {
     );
   }
 
+  // Shared navigation handler used by both Sidebar (desktop) and
+  // MobileBottomNav (phone) so the URL pushState + view switch are
+  // consistent across both chromes.
+  const navigateTo = (v: string) => {
+    setCurrentView(v as any);
+    if (v === 'create') {
+      setMobileShowList(false);
+      window.history.pushState({}, '', '/');
+    } else if (v === 'library') {
+      window.history.pushState({}, '', '/library');
+    } else if (v === 'search') {
+      window.history.pushState({}, '', '/search');
+    } else if (v === 'news') {
+      window.history.pushState({}, '', '/news');
+    } else if (v === 'profile') {
+      // "Profile" tab in mobile nav — opens Settings for now; once we have a
+      // dedicated mobile profile page this can route there instead.
+      setShowSettingsModal(true);
+      return;
+    }
+    if (isMobile) setShowLeftSidebar(false);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-suno-DEFAULT text-zinc-900 dark:text-white font-sans antialiased selection:bg-pink-500/30 transition-colors duration-300">
+      {/* Mobile-only top header. Hidden on md+ where the Sidebar's brand
+          block covers the same job. */}
+      <MobileHeader
+        isAuthenticated={isAuthenticated}
+        onOpenSettings={() => setShowSettingsModal(true)}
+        onSignInClick={() => setShowUsernameModal(true)}
+      />
+
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar
-          currentView={currentView}
-          onNavigate={(v) => {
-            setCurrentView(v);
-            if (v === 'create') {
-              setMobileShowList(false);
-              window.history.pushState({}, '', '/');
-            } else if (v === 'library') {
-              window.history.pushState({}, '', '/library');
-            } else if (v === 'search') {
-              window.history.pushState({}, '', '/search');
-            } else if (v === 'news') {
-              window.history.pushState({}, '', '/news');
-            }
-            if (isMobile) setShowLeftSidebar(false);
-          }}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          user={user}
-          onLogin={() => setShowUsernameModal(true)}
-          onLogout={logout}
-          onOpenSettings={() => setShowSettingsModal(true)}
-          isOpen={showLeftSidebar}
-          onToggle={() => setShowLeftSidebar(!showLeftSidebar)}
-        />
+        {/* Sidebar — hidden on mobile via Tailwind's hidden md:flex so the
+            MobileBottomNav owns navigation on phones. Keeps the existing
+            desktop sidebar untouched. */}
+        <div className="hidden md:flex">
+          <Sidebar
+            currentView={currentView}
+            onNavigate={navigateTo}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            user={user}
+            onLogin={() => setShowUsernameModal(true)}
+            onLogout={logout}
+            onOpenSettings={() => setShowSettingsModal(true)}
+            isOpen={showLeftSidebar}
+            onToggle={() => setShowLeftSidebar(!showLeftSidebar)}
+          />
+        </div>
 
         {/* min-w-0 is the Safari fix — without it, flex children with content
             (long song titles / descriptions in SongList rows) refuse to
             shrink below their intrinsic width, pushing the whole layout
             past the viewport edge. Chrome is more permissive; Safari isn't.
             overflow-x-hidden is a belt-and-braces fallback in case anything
-            nested still produces stray horizontal scroll. */}
-        <main className="flex-1 min-w-0 flex overflow-hidden overflow-x-hidden relative">
+            nested still produces stray horizontal scroll. pb-32 keeps the
+            content from sitting under the mobile Player + bottom tab bar. */}
+        <main className="flex-1 min-w-0 flex overflow-hidden overflow-x-hidden relative pb-[calc(env(safe-area-inset-bottom)+5rem)] md:pb-0">
           {renderContent()}
         </main>
       </div>
+
+      {/* Mobile bottom tab bar — primary nav on phones. Sits above the
+          Player when one is visible; otherwise pinned to the bottom edge. */}
+      <MobileBottomNav
+        currentView={currentView}
+        onNavigate={navigateTo}
+        username={user?.username}
+        avatarUrl={user?.avatar_url}
+        hasPlayer={!!currentSong}
+      />
 
       <Player
         currentSong={currentSong}
