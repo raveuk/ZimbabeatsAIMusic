@@ -24,6 +24,7 @@ import { TrainingPanel } from './components/TrainingPanel';
 import MusicVideoPanel from './components/MusicVideoPanel';
 import { NewsPage } from './components/NewsPage';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { LandingPage } from './components/LandingPage';
 
 
 function AppContent() {
@@ -157,12 +158,10 @@ function AppContent() {
     setToast(prev => ({ ...prev, isVisible: false }));
   };
 
-  // Show username modal if not authenticated and not loading
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      setShowUsernameModal(true);
-    }
-  }, [authLoading, isAuthenticated]);
+  // Unauthenticated visitors now land on <LandingPage/> first; they open the
+  // sign-in modal explicitly via the landing's CTAs. The auto-popup pattern
+  // we used to have here ambushed visitors before they saw what the product
+  // even was.
 
   // Load Playlists
   useEffect(() => {
@@ -669,20 +668,18 @@ function AppContent() {
   }, [currentSong, songs]);
 
   // Helper to cleanup a job and check if all jobs are done
-  const cleanupJob = useCallback((jobId: string, tempId: string) => {
+  const cleanupJob = useCallback((jobId: string, _tempId: string) => {
     const jobData = activeJobsRef.current.get(jobId);
     if (jobData) {
       clearInterval(jobData.pollInterval);
       activeJobsRef.current.delete(jobId);
     }
-
-    // Remove temp song
-    setSongs(prev => prev.filter(s => s.id !== tempId));
-
-    // Update active job count
+    // Don't filter the row out — the song id IS the backend track id now
+    // (handleGenerate no longer creates an optimistic temp). refreshSongsList
+    // runs right after this cleanup and brings in the row with its final
+    // status='done' shape (audioUrl, coverUrl, duration). Deleting here
+    // would just cause a flash of "song gone, song back".
     setActiveJobCount(activeJobsRef.current.size);
-
-    // If no more active jobs, set isGenerating to false
     if (activeJobsRef.current.size === 0) {
       setIsGenerating(false);
     }
@@ -712,6 +709,14 @@ function AppContent() {
         userId: s.user_id,
         creator: s.creator,
         ditModel: s.ditModel,
+        // Carry generation state through so queued/running rows render as
+        // "Creating…" with a live percentage in SongList. Without these three
+        // fields, the remap drops the flags toFspeciiSong sets — and the row
+        // appears as a completed song with title + 0:00 duration even though
+        // the backend status is still 'running'.
+        isGenerating: (s as any).isGenerating,
+        progress: (s as any).progress,
+        queuePosition: (s as any).queuePosition,
         generationParams: (() => {
           try {
             if (!s.generation_params) return undefined;
@@ -722,24 +727,38 @@ function AppContent() {
         })(),
       }));
 
-      // Preserve any generating *temp* songs whose real backend row isn't in
-      // the loaded list yet. Once the backend track shows up (we map jobId
-      // -> tempId via activeJobsRef), drop the temp duplicate — otherwise
-      // the UI shows two "Generating…" cards for one actual job.
-      const loadedIds = new Set(loadedSongs.map(s => s.id));
-      const stillNeededTempIds = new Set<string>();
-      activeJobsRef.current.forEach(({ tempId }, jobId) => {
-        if (!loadedIds.has(jobId)) stillNeededTempIds.add(tempId);
-      });
+      // Merge backend rows against the currently-displayed list. Since
+      // handleGenerate now re-keys the optimistic temp to the real track-id,
+      // ids match across both sides. When the backend version is still
+      // generating (queued/running), keep the temp's polling-updated
+      // progress/stage on top of any newer backend fields. When the backend
+      // says done, take the backend version wholesale so audioUrl/coverUrl
+      // resolve.
       setSongs(prev => {
-        const generatingSongs = prev.filter(s => s.isGenerating && stillNeededTempIds.has(s.id));
-        const mergedSongs = [...generatingSongs];
+        const prevById = new Map(prev.map(s => [s.id, s] as const));
+        const merged: Song[] = [];
+        const seen = new Set<string>();
         for (const song of loadedSongs) {
-          if (!mergedSongs.some(s => s.id === song.id)) {
-            mergedSongs.push(song);
+          seen.add(song.id);
+          const existing = prevById.get(song.id);
+          if (existing && song.isGenerating) {
+            merged.push({
+              ...song,
+              progress: existing.progress ?? song.progress,
+              stage: existing.stage ?? (song as Song).stage,
+              queuePosition: existing.queuePosition ?? song.queuePosition,
+            });
+          } else {
+            merged.push(song);
           }
         }
-        return mergedSongs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        // Re-add any in-flight songs the backend hasn't surfaced yet — covers
+        // the ~50-500 ms race between handleGenerate's setSongs and the first
+        // refreshSongsList completing.
+        for (const s of prev) {
+          if (s.isGenerating && !seen.has(s.id)) merged.push(s);
+        }
+        return merged.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       });
 
       // If the current selection was a temp/generating song, replace it with newest real song
@@ -896,23 +915,12 @@ function AppContent() {
     setCurrentView('create');
     setMobileShowList(false);
 
-    // Create unique temp ID for this job
-    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const tempSong: Song = {
-      id: tempId,
-      title: params.title || 'Generating...',
-      lyrics: '',
-      style: params.style,
-      coverUrl: 'https://picsum.photos/200/200?blur=10',
-      duration: '--:--',
-      createdAt: new Date(),
-      isGenerating: true,
-      tags: params.customMode ? ['custom'] : ['simple'],
-      isPublic: true
-    };
-
-    setSongs(prev => [tempSong, ...prev]);
-    setSelectedSong(tempSong);
+    // No optimistic "temp_xxx" row anymore. The backend inserts a track row
+    // with status='queued' on the POST itself, and toFspeciiSong now marks
+    // that row as `isGenerating: true` (api.ts). After the POST returns we
+    // pull it in via refreshSongsList — single source of truth, no duplicate
+    // "Generating…" + "Creating…" rows for the same logical job. Latency
+    // before the user sees a row is ~200-500 ms (the POST round-trip).
     setShowRightSidebar(true);
 
     try {
@@ -974,11 +982,14 @@ function AppContent() {
         isFormatCaption: params.isFormatCaption,
       }, token);
 
-      beginPollingJob(job.jobId, tempId);
+      // job.jobId is String(trackId) — the real backend row id. Pull it in
+      // and poll status onto that row. No temp, no duplicates.
+      const realId = String(job.jobId);
+      await refreshSongsList();
+      beginPollingJob(job.jobId, realId);
 
     } catch (e) {
       console.error('Generation error:', e);
-      setSongs(prev => prev.filter(s => s.id !== tempId));
 
       // Only set isGenerating to false if no other jobs are running
       if (activeJobsRef.current.size === 0) {
@@ -988,57 +999,29 @@ function AppContent() {
     }
   };
 
-  // Resume active jobs on refresh so progress keeps updating
+  // Resume active jobs on refresh so progress keeps updating. We no longer
+  // insert `job_<jobId>` temp rows here — the backend's getMySongs already
+  // returns in-flight tracks as `isGenerating: true` (via toFspeciiSong),
+  // so all we need to do is restart polling for each one so progress %
+  // keeps ticking instead of freezing at "Creating…" until the row
+  // completes.
   useEffect(() => {
     if (!isAuthenticated || !token) return;
-
-    const resumeJobs = async () => {
+    (async () => {
       try {
         const history = await generateApi.getHistory(token);
         const jobs = Array.isArray(history.jobs) ? history.jobs : [];
-
-        const activeStatuses = new Set(['pending', 'queued', 'running']);
-        const jobsToResume = jobs.filter((job: any) => activeStatuses.has(job.status));
-
-        if (jobsToResume.length === 0) return;
-
-        setSongs(prev => {
-          const existingIds = new Set(prev.map(s => s.id));
-          const next = [...prev];
-
-          for (const job of jobsToResume) {
-            const jobId = job.id || job.jobId;
-            if (!jobId) continue;
-            const tempId = `job_${jobId}`;
-            if (existingIds.has(tempId)) continue;
-
-            const params = (() => {
-              try {
-                if (!job.params) return {};
-                return typeof job.params === 'string' ? JSON.parse(job.params) : job.params;
-              } catch {
-                return {};
-              }
-            })();
-
-            next.unshift(buildTempSongFromParams(params, tempId, job.created_at));
-            existingIds.add(tempId);
-          }
-          return next;
-        });
-
-        for (const job of jobsToResume) {
+        const active = new Set(['pending', 'queued', 'running']);
+        for (const job of jobs as any[]) {
+          if (!active.has(job.status)) continue;
           const jobId = job.id || job.jobId;
           if (!jobId) continue;
-          const tempId = `job_${jobId}`;
-          beginPollingJob(jobId, tempId);
+          beginPollingJob(String(jobId), String(jobId));
         }
       } catch (error) {
         console.error('Failed to resume jobs:', error);
       }
-    };
-
-    resumeJobs();
+    })();
   }, [isAuthenticated, token, beginPollingJob]);
 
   const togglePlay = () => {
@@ -1554,6 +1537,22 @@ function AppContent() {
     }
   };
 
+  // Unauthenticated front door — visitors see the landing page first.
+  // The sign-in modal still renders below so clicking any CTA opens it,
+  // keeping the existing SignInModal / Google flow unchanged.
+  if (!authLoading && !isAuthenticated) {
+    return (
+      <>
+        <LandingPage onSignInClick={() => setShowUsernameModal(true)} />
+        <UsernameModal
+          isOpen={showUsernameModal}
+          onClose={() => setShowUsernameModal(false)}
+          onSubmit={async () => { setShowUsernameModal(false); }}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-suno-DEFAULT text-zinc-900 dark:text-white font-sans antialiased selection:bg-pink-500/30 transition-colors duration-300">
       <div className="flex-1 flex overflow-hidden">
@@ -1644,6 +1643,7 @@ function AppContent() {
       />
       <UsernameModal
         isOpen={showUsernameModal}
+        onClose={() => setShowUsernameModal(false)}
         onSubmit={handleUsernameSubmit}
       />
       <SettingsModal

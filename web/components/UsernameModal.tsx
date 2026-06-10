@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Sparkles } from 'lucide-react';
+import { Mail, Lock, Sparkles, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 // Sign-in / sign-up modal. Replaces the upstream UI's username-only flow.
-// Mounted in App.tsx as <UsernameModal isOpen=… onSubmit=… />; we ignore both
-// props and drive visibility off the auth context (modal is only visible when
-// the user is not authenticated and auth bootstrapping has finished).
+// Now respects `isOpen` so the landing page can render it as an on-demand
+// overlay opened by sign-in CTAs (the previous "auto-pop whenever not
+// authenticated" behaviour ambushed visitors before they saw the product).
 interface UsernameModalProps {
   isOpen: boolean;
+  onClose?: () => void;
   onSubmit?: (username: string) => Promise<void>;
 }
 
-export const UsernameModal: React.FC<UsernameModalProps> = (_props) => {
+export const UsernameModal: React.FC<UsernameModalProps> = ({ isOpen, onClose }) => {
   const { isAuthenticated, isLoading, signIn, signUp, signInWithGoogle, sendPasswordReset } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -21,8 +22,9 @@ export const UsernameModal: React.FC<UsernameModalProps> = (_props) => {
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Hide while auth is still bootstrapping OR once we're signed in.
-  if (isLoading || isAuthenticated) return null;
+  // Hide while auth is still bootstrapping OR once we're signed in OR when
+  // the caller has flipped isOpen=false.
+  if (!isOpen || isLoading || isAuthenticated) return null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,10 +58,19 @@ export const UsernameModal: React.FC<UsernameModalProps> = (_props) => {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative w-full max-w-md bg-zinc-900 rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500" />
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 flex items-center justify-center text-zinc-400 hover:text-white transition"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        )}
 
         <div className="p-8">
           <div className="flex justify-center mb-6">

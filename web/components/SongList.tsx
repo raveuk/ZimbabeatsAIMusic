@@ -653,7 +653,9 @@ const SongItem: React.FC<SongItemProps> = ({
                                     }
                                 }}
                             >
-                                {song.title || (song.isGenerating ? (song.queuePosition ? "Queued..." : "Creating...") : "Untitled")}
+                                {song.isGenerating
+                                    ? (song.queuePosition ? "Queued..." : "Creating...")
+                                    : (song.title || "Untitled")}
                             </h3>
                         )}
                         <span className="inline-flex items-center justify-center text-[9px] font-bold text-white bg-gradient-to-r from-pink-500 to-purple-500 px-1.5 py-0.5 rounded-sm shadow-sm" title={`DiT model: ${song.ditModel || 'undefined'}`}>
@@ -782,12 +784,21 @@ const SongItem: React.FC<SongItemProps> = ({
                 )}
             </div>
 
-            {/* Timestamp */}
+            {/* Top-right status — duration when done, percent / queue position
+                while generating. The percent is the most useful at-a-glance
+                signal during a 3-4 min render, so we surface it here (in
+                addition to the tiny one inside the cover thumbnail). */}
             <div className="text-xs font-mono text-zinc-500 dark:text-zinc-600 self-start pt-1">
                 {song.isGenerating ? (
-                    <span className={song.queuePosition ? 'text-amber-500' : 'text-pink-500'}>
-                        {song.queuePosition ? `#${song.queuePosition}` : 'Creating...'}
-                    </span>
+                    song.queuePosition ? (
+                        <span className="text-amber-500">#{song.queuePosition}</span>
+                    ) : typeof song.progress === 'number' && song.progress > 0 ? (
+                        <span className="text-pink-500 tabular-nums font-semibold text-sm">
+                            {Math.round((song.progress > 1 ? song.progress / 100 : song.progress) * 100)}%
+                        </span>
+                    ) : (
+                        <span className="text-pink-500">Creating...</span>
+                    )
                 ) : song.duration}
             </div>
         </div>

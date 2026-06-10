@@ -221,11 +221,23 @@ function toFspeciiSong(t: BackendTrack, currentUser?: User | null): Song {
   const coverSigned = coverRel ? withSignedToken(`${API_BASE}${coverRel}`) : undefined;
   return {
     id,
-    title: t.title || `Track #${t.id}`,
+    // Leave title empty when the backend didn't store one — the SongList row
+    // (and SongProfile) decide what to render in that case ("Creating…" while
+    // generating, "Untitled" once done). Falling back to "Track #${id}" here
+    // ended up baked into the title field of next-generated tracks because
+    // the frontend sends `title` from state, and the Reuse / current-song
+    // flow copies this displayed string back into state.
+    title: t.title || '',
     lyrics: String(t.params.lyrics || ''),
     style: String(t.params.style || ''),
     caption: undefined,
+    // The Song type carries BOTH cover_url/audio_url (snake_case, for the
+    // backend-mapper compatibility paths) and coverUrl/audioUrl (camelCase,
+    // which is what SongList / Player / SongProfile actually read). Without
+    // the camelCase version, the row falls back to the synthetic AlbumCover
+    // gradient even though the real cover PNG exists on disk.
     cover_url: coverSigned,
+    coverUrl:  coverSigned,
     audio_url: audioSigned,
     audioUrl:  audioSigned,
     duration: typeof t.params.duration === 'number' ? t.params.duration : undefined,
@@ -241,6 +253,17 @@ function toFspeciiSong(t: BackendTrack, currentUser?: User | null): Song {
     creator_avatar: undefined,
     created_at: t.createdAt,
     generation_params: t.params,
+    // Queued/running tracks must render as "Generating…" cards, NOT as
+    // ready-to-play rows. Without this, a freshly POST'd track shows up in
+    // the workspace with the user-requested duration mis-rendered as the
+    // real audio length (e.g. "3:59" for a track that hasn't started yet),
+    // alongside the optimistic temp row from handleGenerate — i.e. the
+    // duplicate the user has been seeing.
+    isGenerating: t.status !== 'done',
+    progress: t.progress?.percent != null
+      ? (t.progress.percent > 1 ? t.progress.percent / 100 : t.progress.percent)
+      : undefined,
+    queuePosition: t.queuePosition ?? undefined,
   };
 }
 
@@ -849,10 +872,14 @@ export const generateApi = {
     }
   },
 
-  // We don't ship random sample prompts — return an empty, neutral default.
-  getRandomDescription: async (): Promise<{ description: string; instrumental: boolean; vocalLanguage: string }> => ({
-    description: '', instrumental: false, vocalLanguage: 'en',
-  }),
+  // Dice icon next to "Describe Your Song" in Simple mode. Hits our backend
+  // sample-prompt pool (see server/app/api/generate/random-description/route.js),
+  // returns the same shape as the upstream ace-step-ui Gradio endpoint so the
+  // CreatePanel handler is unchanged.
+  getRandomDescription: (
+    token?: string,
+  ): Promise<{ description: string; instrumental: boolean; vocalLanguage: string }> =>
+    api('/api/generate/random-description', { token }),
 
   // LoRA / training APIs aren't supported in our stack — stubs prevent crashes.
   loadLora:     async (_p: { lora_path: string }) => ({ message: 'LoRA not supported here.', lora_path: '' }),
