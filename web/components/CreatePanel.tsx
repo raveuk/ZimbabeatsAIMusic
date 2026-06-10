@@ -256,9 +256,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   // 30 is the XL SFT default the backend template ships with; matches what
   // the mobile app effectively used. Persist the last value so users who
   // intentionally lowered it for Turbo speed don't get bumped back to 30.
+  // Default raised 30 → 50 for cleaner Studio output. 30 was the legacy
+  // mobile-app value where speed mattered; on a 3090 the time delta is
+  // ~30s, well worth the quality bump (less artefact noise, less of the
+  // auto-tune timbre the lower step counts settle into).
   const [inferenceSteps, setInferenceSteps] = useState<number>(() => {
     const stored = parseInt(localStorage.getItem('ace-inferenceSteps') || '', 10);
-    return Number.isFinite(stored) && stored >= 8 && stored <= 60 ? stored : 30;
+    return Number.isFinite(stored) && stored >= 8 && stored <= 60 ? stored : 50;
   });
   useEffect(() => {
     try { localStorage.setItem('ace-inferenceSteps', String(inferenceSteps)); } catch {}
@@ -1951,6 +1955,38 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                       {tag}
                     </button>
                   ))}
+                </div>
+                {/* Anti auto-tune presets — ACE-Step (Studio / XL SFT) was
+                    trained heavily on polished modern music and falls into
+                    auto-tuned timbre by default. Negative prompts don't work
+                    (see docs/lm-negative-prompt.md), so the only lever is
+                    nudging the *positive* tags toward raw/organic terms.
+                    Tapping one appends it to the style. Stylistically pink
+                    so it reads as a quality lever, not just another genre. */}
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-zinc-500 dark:text-zinc-500 font-bold mb-1.5">
+                    Less auto-tune
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      'raw vocals',
+                      'live recording',
+                      'natural vocals',
+                      'unprocessed',
+                      'warm analog',
+                      'lo-fi',
+                      'acoustic',
+                      'organic feel',
+                    ].map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => setStyle(prev => prev ? `${prev}, ${tag}` : tag)}
+                        className="text-[10px] font-medium bg-pink-50 dark:bg-pink-500/10 hover:bg-pink-100 dark:hover:bg-pink-500/20 text-pink-600 dark:text-pink-300 px-2.5 py-1 rounded-full transition-colors border border-pink-200/60 dark:border-pink-500/20"
+                      >
+                        + {tag}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
