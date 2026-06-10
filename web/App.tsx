@@ -158,10 +158,16 @@ function AppContent() {
     setToast(prev => ({ ...prev, isVisible: false }));
   };
 
-  // Unauthenticated visitors now land on <LandingPage/> first; they open the
-  // sign-in modal explicitly via the landing's CTAs. The auto-popup pattern
-  // we used to have here ambushed visitors before they saw what the product
-  // even was.
+  // Auto-popup the sign-in modal when unauthenticated. The marketing
+  // landing lives at /welcome (see below) so root visitors continue to
+  // get the original gate-first experience.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.location.pathname === '/welcome') return; // landing owns its own modal
+    if (!authLoading && !isAuthenticated) {
+      setShowUsernameModal(true);
+    }
+  }, [authLoading, isAuthenticated]);
 
   // Load Playlists
   useEffect(() => {
@@ -1537,10 +1543,10 @@ function AppContent() {
     }
   };
 
-  // Unauthenticated front door — visitors see the landing page first.
-  // The sign-in modal still renders below so clicking any CTA opens it,
-  // keeping the existing SignInModal / Google flow unchanged.
-  if (!authLoading && !isAuthenticated) {
+  // Marketing landing is parked at /welcome while we iterate on it. Anyone
+  // visiting that path (signed in or not) sees the landing. Sign-in CTAs
+  // open the existing UsernameModal in-page.
+  if (typeof window !== 'undefined' && window.location.pathname === '/welcome') {
     return (
       <>
         <LandingPage onSignInClick={() => setShowUsernameModal(true)} />
