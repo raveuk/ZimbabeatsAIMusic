@@ -1620,9 +1620,10 @@ function AppContent() {
             shrink below their intrinsic width, pushing the whole layout
             past the viewport edge. Chrome is more permissive; Safari isn't.
             overflow-x-hidden is a belt-and-braces fallback in case anything
-            nested still produces stray horizontal scroll. pb-32 keeps the
-            content from sitting under the mobile Player + bottom tab bar. */}
-        <main className="flex-1 min-w-0 flex overflow-hidden overflow-x-hidden relative pb-[calc(env(safe-area-inset-bottom)+5rem)] md:pb-0">
+            nested still produces stray horizontal scroll. The inner views
+            (SongList / LibraryView) own their own bottom padding so we don't
+            double up and create a giant dead band above the mobile tab bar. */}
+        <main className="flex-1 min-w-0 flex overflow-hidden overflow-x-hidden relative">
           {renderContent()}
         </main>
       </div>

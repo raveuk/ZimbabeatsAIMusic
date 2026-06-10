@@ -101,8 +101,12 @@ export const Player: React.FC<PlayerProps> = ({
 
     // Show minimal player when no song is playing
     if (!currentSong) {
+        // On mobile the bottom tab bar owns the foot of the screen — adding a
+        // permanent 80px "Select a song to play" prompt creates dead space
+        // above the tab bar. Hide it there; show only on md+ where the
+        // desktop layout has dedicated room.
         return (
-            <div className="h-20 lg:h-24 bg-white dark:bg-black/95 backdrop-blur border-t border-zinc-200 dark:border-white/10 flex items-center justify-center z-50 transition-colors duration-300 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] dark:shadow-none">
+            <div className="hidden md:flex h-20 lg:h-24 bg-white dark:bg-black/95 backdrop-blur border-t border-zinc-200 dark:border-white/10 items-center justify-center z-50 transition-colors duration-300 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] dark:shadow-none">
                 <button
                     onClick={() => onPlayFirst?.()}
                     className="flex items-center gap-3 text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 cursor-pointer transition-colors"

@@ -216,7 +216,7 @@ export const SongList: React.FC<SongListProps> = ({
     const selectedSongs = selectableSongs.filter(song => selectedIds.has(song.id));
 
     return (
-        <div className="flex-1 bg-white dark:bg-black h-full overflow-y-auto custom-scrollbar p-6 pb-32 transition-colors duration-300">
+        <div className="flex-1 bg-white dark:bg-black h-full overflow-y-auto custom-scrollbar p-3 md:p-6 pb-24 md:pb-32 transition-colors duration-300">
             <div className="max-w-5xl mx-auto w-full"> {/* Container constraint */}
 
                 {/* Header */}

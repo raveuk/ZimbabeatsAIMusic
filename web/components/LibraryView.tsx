@@ -67,7 +67,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
     return (
         <>
-        <div className="flex-1 bg-white dark:bg-black overflow-y-auto custom-scrollbar p-6 lg:p-10 pb-32 transition-colors duration-300">
+        <div className="flex-1 bg-white dark:bg-black overflow-y-auto custom-scrollbar p-3 md:p-6 lg:p-10 pb-24 md:pb-32 transition-colors duration-300">
              <div className="flex items-center justify-between mb-8">
                 <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">{t('yourLibrary')}</h1>
                 <button 

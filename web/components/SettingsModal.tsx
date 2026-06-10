@@ -43,15 +43,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
         return null;
     }
 
+    // user.createdAt is sometimes undefined or non-ISO depending on the
+    // backend mapping — Date(undefined) → Invalid Date. Guard so we render
+    // a clean empty string instead of "Member since Invalid Date".
+    const memberSinceLabel = (() => {
+        const raw = (user as any).createdAt ?? (user as any).created_at;
+        if (!raw) return '';
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', year: 'numeric' });
+    })();
+
     return (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+        <div
+            className="fixed inset-0 bg-black/50 z-[60] flex items-end md:items-center justify-center p-0 md:p-4"
+            onClick={onClose}
+        >
             <div
-                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+                className="bg-white dark:bg-zinc-900 rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] md:max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-white/5">
-                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">{t('settings')}</h2>
+                <div className="flex items-center justify-between p-4 md:p-6 border-b border-zinc-200 dark:border-white/5 sticky top-0 bg-white dark:bg-zinc-900 z-10">
+                    <h2 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-white">{t('settings')}</h2>
                     <button
                         onClick={onClose}
                         className="p-2 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-full transition-colors"
@@ -60,43 +74,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                     </button>
                 </div>
 
-                <div className="p-6 space-y-8">
-                    {/* User Profile Section */}
-                    <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl font-bold text-white shadow-lg overflow-hidden">
+                <div className="p-4 md:p-6 space-y-6 md:space-y-8">
+                    {/* User Profile Section — flex-wrap so mobile stacks the
+                        buttons under the avatar+name instead of overflowing. */}
+                    <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 md:p-6">
+                        <div className="flex flex-wrap items-center gap-3 md:gap-4">
+                            <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl md:text-2xl font-bold text-white shadow-lg overflow-hidden flex-shrink-0">
                                 {user.avatar_url ? (
                                     <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
                                 ) : (
                                     user.username[0].toUpperCase()
                                 )}
                             </div>
-                            <div className="flex-1">
-                                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">@{user.username}</h3>
-                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
-                                    {t('memberSince')} {new Date(user.createdAt).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', year: 'numeric' })}
-                                </p>
+                            <div className="flex-1 min-w-0">
+                                <h3 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white truncate">@{user.username}</h3>
+                                {memberSinceLabel && (
+                                    <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
+                                        {t('memberSince')} {memberSinceLabel}
+                                    </p>
+                                )}
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                                 <button
                                     onClick={() => {
                                         onClose();
                                         setIsEditProfileOpen(true);
                                     }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
                                 >
                                     <Edit3 size={16} />
-                                    {t('editProfile')}
+                                    <span className="truncate">{t('editProfile')}</span>
                                 </button>
                                 <button
                                     onClick={() => {
                                         onClose();
                                         onNavigateToProfile?.(user.username);
                                     }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white rounded-lg text-sm font-medium hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white rounded-lg text-sm font-medium hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
                                 >
                                     <ExternalLink size={16} />
-                                    {t('viewProfile')}
+                                    <span className="truncate">{t('viewProfile')}</span>
                                 </button>
                             </div>
                         </div>
