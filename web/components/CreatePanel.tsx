@@ -1246,7 +1246,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   return (
     <div
-      className="relative flex flex-col h-full bg-zinc-50 dark:bg-suno-panel w-full overflow-y-auto custom-scrollbar transition-colors duration-300"
+      className="relative flex flex-col h-full bg-zinc-50 dark:bg-suno-panel w-full overflow-y-auto custom-scrollbar transition-colors duration-300 pb-[calc(env(safe-area-inset-bottom)_+_3.5rem)] md:pb-0"
       onDrop={handleWorkspaceDrop}
       onDragOver={handleWorkspaceDragOver}
     >
@@ -3292,7 +3292,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           the button SITS ABOVE the tab bar instead of underneath it.
           Desktop keeps bottom-0 because the desktop layout has no fixed
           bottom nav to clear. */}
-      <div className="p-4 mt-auto sticky bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] md:bottom-0 bg-zinc-50/95 dark:bg-suno-panel/95 backdrop-blur-sm z-50 border-t border-zinc-200 dark:border-white/5 space-y-3">
+      <div className="p-4 mt-auto sticky bottom-[calc(env(safe-area-inset-bottom)_+_3.5rem)] md:bottom-0 bg-zinc-50/95 dark:bg-suno-panel/95 backdrop-blur-sm z-50 border-t border-zinc-200 dark:border-white/5 space-y-3">
         <button
           onClick={handleGenerate}
           className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110 disabled:opacity-50"
