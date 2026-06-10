@@ -1439,7 +1439,7 @@ function AppContent() {
       case 'create':
       default:
         return (
-          <div className="flex h-full overflow-hidden relative w-full">
+          <div className="flex h-full overflow-hidden relative w-full min-w-0">
             {/* Create Panel */}
             <div
               className={`
@@ -1474,10 +1474,12 @@ function AppContent() {
               </div>
             )}
 
-            {/* Song List */}
+            {/* Song List — min-w-0 lets the flex item shrink below the
+                intrinsic width of its content (Safari needs this on flex-1
+                children or the layout overflows). */}
             <div className={`
               ${!mobileShowList ? 'hidden md:flex' : 'flex'}
-              flex-1 flex-col h-full overflow-hidden bg-white dark:bg-suno-DEFAULT transition-colors duration-300
+              flex-1 min-w-0 flex-col h-full overflow-hidden bg-white dark:bg-suno-DEFAULT transition-colors duration-300
             `}>
               <SongList
                 songs={songs}
@@ -1588,7 +1590,13 @@ function AppContent() {
           onToggle={() => setShowLeftSidebar(!showLeftSidebar)}
         />
 
-        <main className="flex-1 flex overflow-hidden relative">
+        {/* min-w-0 is the Safari fix — without it, flex children with content
+            (long song titles / descriptions in SongList rows) refuse to
+            shrink below their intrinsic width, pushing the whole layout
+            past the viewport edge. Chrome is more permissive; Safari isn't.
+            overflow-x-hidden is a belt-and-braces fallback in case anything
+            nested still produces stray horizontal scroll. */}
+        <main className="flex-1 min-w-0 flex overflow-hidden overflow-x-hidden relative">
           {renderContent()}
         </main>
       </div>
