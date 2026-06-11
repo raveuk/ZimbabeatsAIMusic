@@ -2143,25 +2143,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
             {showLoraPanel && (
               <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
-                {/* LoRA Path Input */}
+                {/* Trained LoRA picker — the ONLY wired LoRA path. Selecting a
+                    LoRA here forwards loraName (when Use LoRA is on), and the
+                    backend injects a LoraLoaderModelOnly node into the graph
+                    (workflow.js:152). Catalogue hydrates from /api/models.
+
+                    REMOVED: the old raw-path input + Load/Unload button +
+                    "LoRA Unloaded" status. Those drove loadLora/unloadLora/
+                    getLoraStatus, which are stubs ("LoRA not supported here"),
+                    so the button did nothing AND it froze the scale/toggle
+                    behind a `loraLoaded` flag that never flipped true. Now the
+                    Use LoRA toggle + Scale gate on whether a LoRA is selected. */}
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Trained LoRA</label>
-                  {/* Task #19 — pick a LoRA the user trained via the Training
-                      page. Catalogue is hydrated from /api/models which
-                      queries ComfyUI's LoraLoaderModelOnly dropdown so a
-                      freshly-exported LoRA appears immediately on next
-                      render. Selecting an entry sets the legacy loraPath
-                      input so the existing Load button still works as a
-                      fallback for raw-path users. */}
                   <select
                     value={trainedLoraName}
                     onChange={(e) => {
                       const v = e.target.value;
                       setTrainedLoraName(v);
-                      if (v) {
-                        setLoraPath(v);
-                        setLoraEnabled(true);
-                      }
+                      if (v) setLoraEnabled(true);
                     }}
                     className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
                   >
@@ -2175,76 +2175,34 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                       No trained LoRAs yet — visit the Training page to build one.
                     </p>
                   )}
-                  <label className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 mt-2 block">
-                    Or paste a raw path / filename (advanced)
-                  </label>
-                  <input
-                    type="text"
-                    value={loraPath}
-                    onChange={(e) => setLoraPath(e.target.value)}
-                    placeholder={t('loraPathPlaceholder')}
-                    className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors"
-                  />
                 </div>
 
-                {/* LoRA Load/Unload Toggle */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between py-2 border-t border-zinc-100 dark:border-white/5">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${
-                        loraLoaded ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-                      }`}></div>
-                      <span className={`text-xs font-medium ${
-                        loraLoaded ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                      }`}>
-                        {loraLoaded ? t('loraLoaded') : t('loraUnloaded')}
-                      </span>
-                    </div>
-                    <button
-                      onClick={handleLoraToggle}
-                      disabled={!loraPath.trim() || isLoraLoading}
-                      className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                        loraLoaded
-                          ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/20 hover:from-green-600 hover:to-emerald-700'
-                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-                      }`}
-                    >
-                      {isLoraLoading ? '...' : (loraLoaded ? t('loraUnload') : t('loraLoad'))}
-                    </button>
-                  </div>
-                  {loraError && (
-                    <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
-                      {loraError}
-                    </div>
-                  )}
-                </div>
-
-                {/* Use LoRA Checkbox (enable/disable without unloading) */}
-                <div className={`flex items-center justify-between py-2 border-t border-zinc-100 dark:border-white/5 ${!loraLoaded ? 'opacity-40 pointer-events-none' : ''}`}>
-                  <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                {/* Use LoRA + Scale — active only when a LoRA is selected.
+                    Gated on trainedLoraName (not the dead loraLoaded flag), and
+                    they set local state directly (no stub API calls). */}
+                <div className={`space-y-3 ${!trainedLoraName ? 'opacity-40 pointer-events-none' : ''}`}>
+                  <label className="flex items-center justify-between py-2 border-t border-zinc-100 dark:border-white/5 cursor-pointer">
+                    <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Use LoRA</span>
                     <input
                       type="checkbox"
                       checked={loraEnabled}
-                      onChange={handleLoraEnabledToggle}
-                      disabled={!loraLoaded}
+                      onChange={(e) => setLoraEnabled(e.target.checked)}
+                      disabled={!trainedLoraName}
                       className="accent-pink-600"
                     />
-                    Use LoRA
                   </label>
-                </div>
-
-                {/* LoRA Scale Slider */}
-                <div className={!loraLoaded || !loraEnabled ? 'opacity-40 pointer-events-none' : ''}>
-                  <EditableSlider
-                    label={t('loraScale')}
-                    value={loraScale}
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    onChange={handleLoraScaleChange}
-                    formatDisplay={(val) => val.toFixed(2)}
-                    helpText={t('loraScaleDescription')}
-                  />
+                  <div className={!loraEnabled ? 'opacity-40 pointer-events-none' : ''}>
+                    <EditableSlider
+                      label={t('loraScale')}
+                      value={loraScale}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      onChange={setLoraScale}
+                      formatDisplay={(val) => val.toFixed(2)}
+                      helpText={t('loraScaleDescription')}
+                    />
+                  </div>
                 </div>
               </div>
             )}

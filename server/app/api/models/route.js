@@ -143,6 +143,19 @@ export const GET = handler(async () => {
   // to enumerate every .safetensors in models/loras/. The CreatePanel LoRA
   // picker hydrates from this. Failure is non-fatal — we just return an
   // empty array and the picker shows "No trained LoRAs yet".
+  //
+  // models/loras/ also holds VIDEO/IMAGE model LoRAs (Wan, LTX, I2V/T2V,
+  // lightx2v, etc.) used by the AI Video pipeline. Those are incompatible with
+  // the ACE-Step audio UNET — feeding one to a music job produces garbage or
+  // errors. Filter them out so the audio LoRA picker only offers audio LoRAs.
+  const VIDEO_LORA_PATTERNS = [
+    "wan", "ltx", "i2v", "t2v", "lightx2v", "hunyuan", "cogvideo",
+    "svd", "animatediff", "image", "video", "flux",
+  ];
+  const isVideoLora = (name) => {
+    const l = name.toLowerCase();
+    return VIDEO_LORA_PATTERNS.some((p) => l.includes(p));
+  };
   let loras = [];
   try {
     const r = await fetch(`${COMFY_URL}/object_info/LoraLoaderModelOnly`, { cache: "no-store" });
@@ -154,6 +167,7 @@ export const GET = handler(async () => {
         const file = String(c).replace(/^local:/, "");
         if (!file.toLowerCase().endsWith(".safetensors")) continue;
         if (seen.has(file)) continue;
+        if (isVideoLora(file)) continue; // skip video/image-model LoRAs
         seen.add(file);
         // Friendlier label: strip our "lora_u{u}_j{j}_" prefix that
         // exportLora adds, leaving just the user-chosen training name.
