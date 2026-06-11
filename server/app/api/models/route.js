@@ -96,6 +96,25 @@ export const GET = handler(async () => {
   // UI reflects whatever is locally downloaded + the auto-download set. A
   // failed fetch (Comfy down, custom node missing) just returns an empty list
   // and the UI hides the voice picker.
+  // Artist/celebrity voices are LOCAL-TEST ONLY — gated behind an env flag so
+  // the deployed backend never serves them (likeness/right-of-publicity risk on
+  // a public commercial product). See sprint/2026-06-11_artist-voices.md.
+  const artistVoicesEnabled = process.env.ENABLE_ARTIST_VOICES === "1";
+
+  // Stock voices are "natural" (the two we treat as default-safe) or "character"
+  // (the rest of the TTS-Audio-Suite set). Everything not in this map and not a
+  // stock filename is treated as an artist voice — those only surface when the
+  // flag is on. ComfyUI exposes artist models living under models/TTS/RVC/artists/
+  // in the same flat LoadRVCModelNode dropdown, so we categorise by filename.
+  const NATURAL = new Set(["claire.pth", "male_1.pth"]);
+  const CHARACTER = new Set(["fuji.pth", "mae_v2.pth", "monika.pth", "sayano.pth"]);
+  const categoryFor = (file) => {
+    const lower = file.toLowerCase();
+    if (NATURAL.has(lower)) return "natural";
+    if (CHARACTER.has(lower)) return "character";
+    return "artist"; // anything else is a user-supplied artist model
+  };
+
   let voices = [];
   if (cloneAvailable()) {
     try {
@@ -111,7 +130,10 @@ export const GET = handler(async () => {
           if (!file.toLowerCase().endsWith(".pth")) continue;
           if (seen.has(file)) continue;
           seen.add(file);
-          voices.push({ id: file, file, label: labelFor(file) });
+          const category = categoryFor(file);
+          // Hide artist voices entirely unless the local-test flag is set.
+          if (category === "artist" && !artistVoicesEnabled) continue;
+          voices.push({ id: file, file, label: labelFor(file), category });
         }
       }
     } catch {}

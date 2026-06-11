@@ -758,6 +758,12 @@ function toBackendBody(p: GenerationParams) {
     topP:           typeof p.lmTopP === 'number' && p.lmTopP > 0 && p.lmTopP <= 1 ? p.lmTopP : undefined,
     topK:           typeof p.lmTopK === 'number' && p.lmTopK >= 0 ? p.lmTopK : undefined,
     shift:          typeof p.shift === 'number' && p.shift > 0 ? p.shift : undefined,
+    // Diffusion guidance → KSampler.cfg (node 3). Previously this slider was
+    // forwarded nowhere ("for show"). Now wired. Backend clamps it.
+    guidanceScale:  typeof p.guidanceScale === 'number' && p.guidanceScale > 0 ? p.guidanceScale : undefined,
+    // ODE/SDE → KSampler.sampler_name (euler vs euler_ancestral). Previously
+    // not forwarded. Now wired so the toggle actually changes the sampler.
+    inferMethod:    p.inferMethod === 'ode' || p.inferMethod === 'sde' ? p.inferMethod : undefined,
     // Negative prompt: deliberately NOT forwarded. The graph rewrite that
     // routed a second TextEncode into KSampler.negative caused reproducible
     // distortion on Studio + cfg=5 (tracks #61/#63/#64). See

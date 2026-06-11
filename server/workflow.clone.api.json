@@ -185,8 +185,8 @@
     "class_type": "RVCEngineNode",
     "inputs": {
       "pitch": 0,
-      "index_ratio": 0.75,
-      "consonant_protection": 0.25,
+      "index_ratio": 0.4,
+      "consonant_protection": 0.3,
       "volume_envelope": 0.25,
       "hubert_model": "auto: Automatically select best available model",
       "output_sample_rate": 0,

@@ -239,7 +239,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     const stored = localStorage.getItem('ace-bulkCount');
     return stored ? Number(stored) : 1;
   });
-  const [guidanceScale, setGuidanceScale] = useState(9.0);
+  // Default 4.0 matches the workflow template's KSampler.cfg. (Was 9.0 while
+  // the slider was unwired/for-show; now that it actually drives KSampler.cfg,
+  // the default must equal the template baseline so wiring it changes nothing
+  // until the user moves it.)
+  const [guidanceScale, setGuidanceScale] = useState(4.0);
   const [randomSeed, setRandomSeed] = useState(true);
   const [seed, setSeed] = useState(-1);
   const [thinking, setThinking] = useState(false); // Default false for GPU compatibility
@@ -267,7 +271,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   useEffect(() => {
     try { localStorage.setItem('ace-inferenceSteps', String(inferenceSteps)); } catch {}
   }, [inferenceSteps]);
-  const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('ode');
+  // Default 'sde' maps to euler_ancestral, the template's sampler. (Was 'ode'
+  // while unwired; now that it drives KSampler.sampler_name, the default must
+  // match the template so existing behaviour is unchanged until the user picks.)
+  const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('sde');
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>('pt');
   // LM Model dropdown is hydrated from /api/models (which reads the live
   // workflow JSON on the backend). lmModel holds the user's pick; if the
@@ -1548,9 +1555,34 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     title={vocalGender === 'both' ? 'Voice clone is unavailable for duets — pick Male or Female to enable' : 'Replace the generated vocal with a cloned voice (runs after generation)'}
                   >
                     <option value="">{t('off') || 'Off (original AI voice)'}</option>
-                    {voiceOptions.map((v) => (
-                      <option key={v.id} value={v.id}>{v.label}</option>
-                    ))}
+                    {/* Group voices by category. Artist voices only appear when the
+                        backend has ENABLE_ARTIST_VOICES=1 (local test). If the
+                        backend sent no category (older payload), fall back to a
+                        single flat list. */}
+                    {(() => {
+                      const cats: Array<{ key: string; label: string }> = [
+                        { key: 'natural',   label: 'Natural' },
+                        { key: 'character', label: 'Character' },
+                        { key: 'artist',    label: 'Artist / Singer' },
+                      ];
+                      const hasCategories = voiceOptions.some((v: any) => v.category);
+                      if (!hasCategories) {
+                        return voiceOptions.map((v: any) => (
+                          <option key={v.id} value={v.id}>{v.label}</option>
+                        ));
+                      }
+                      return cats.map(cat => {
+                        const items = voiceOptions.filter((v: any) => (v.category || 'character') === cat.key);
+                        if (!items.length) return null;
+                        return (
+                          <optgroup key={cat.key} label={cat.label}>
+                            {items.map((v: any) => (
+                              <option key={v.id} value={v.id}>{v.label}</option>
+                            ))}
+                          </optgroup>
+                        );
+                      });
+                    })()}
                   </select>
                 </div>
               )}
@@ -1594,7 +1626,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('key')}</label>
                   <select
                     value={keyScale}
-                    onChange={setKeyScale}
+                    onChange={(e) => setKeyScale(e.target.value)}
                     className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                   >
                     <option value="">Auto</option>
@@ -1607,7 +1639,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('time')}</label>
                   <select
                     value={timeSignature}
-                    onChange={setTimeSignature}
+                    onChange={(e) => setTimeSignature(e.target.value)}
                     className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                   >
                     <option value="">Auto</option>
@@ -1634,7 +1666,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   max="4"
                   step="1"
                   value={batchSize}
-                  onChange={setBatchSize}
+                  onChange={(e) => setBatchSize(Number(e.target.value))}
                   className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
                 />
                 <p className="text-[10px] text-zinc-500">{t('numberOfVariations')}</p>
@@ -2402,13 +2434,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 State stays so other code paths that reference lmBackend
                 don't break — value is locked to 'pt'. */}
 
-            {/* LM Model */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('lmModelLabel')}</label>
+            {/* LM Model — HIDDEN. The workflow's DualCLIPLoader (node 105) is
+                fixed at qwen_0.6b_ace15 + qwen_4b_ace15 and lmModel is not
+                forwarded to the backend, so this dropdown changed nothing — it
+                was misleading. Kept in the tree (display:none) so the lmModel
+                state other code references (startGeneration payload) doesn't
+                break. Un-hide only if/when the backend wires clip_name swapping
+                and alternate qwen models exist on disk. */}
+            <div className="hidden">
               <select
                 value={lmModel}
                 onChange={(e) => { const v = e.target.value; setLmModel(v); localStorage.setItem('ace-lmModel', v); }}
-                className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
               >
                 {lmModelOptions.length > 0 ? (
                   lmModelOptions.map((m) => (
@@ -2418,7 +2454,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                   <option value="">Loading…</option>
                 )}
               </select>
-              <p className="text-[10px] text-zinc-500">{t('lmModelHint')}</p>
             </div>
 
             {/* Seed */}

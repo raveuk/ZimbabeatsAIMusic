@@ -114,6 +114,23 @@ export function buildGraph(input) {
   g[SAMPLER_NODE].inputs.seed = seed;
   if (input.steps != null) g[SAMPLER_NODE].inputs.steps = clamp(Number(input.steps), 1, 60);
 
+  // Diffusion guidance → KSampler.cfg. The frontend "Guidance Scale" slider
+  // used to be forwarded nowhere; now it actually controls the diffusion CFG.
+  // Template default is 4; clamp to a safe band so an extreme value can't
+  // wreck a render.
+  if (input.guidanceScale != null) {
+    g[SAMPLER_NODE].inputs.cfg = clamp(Number(input.guidanceScale), 1, 15);
+  }
+
+  // Infer method → KSampler.sampler_name. ODE = deterministic (euler),
+  // SDE = stochastic/ancestral (euler_ancestral, the template default). The
+  // toggle used to do nothing; now it picks the sampler.
+  if (input.inferMethod === "ode") {
+    g[SAMPLER_NODE].inputs.sampler_name = "euler";
+  } else if (input.inferMethod === "sde") {
+    g[SAMPLER_NODE].inputs.sampler_name = "euler_ancestral";
+  }
+
   // Switch the UNET model based on the UI's ditModel selection. The graph
   // template ships pointing at studio (XL SFT); flip to turbo when requested.
   const modelFile = MODEL_FILES[String(input.ditModel || "").toLowerCase()] || MODEL_FILES.studio;
