@@ -46,7 +46,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         fixed inset-x-0 z-40
         ${hasPlayer ? 'bottom-20' : 'bottom-0'}
         md:hidden
-        bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md
+        bg-white dark:bg-zinc-950
         border-t border-zinc-200 dark:border-white/10
         pb-[env(safe-area-inset-bottom)]
       `}

@@ -1250,7 +1250,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   return (
     <div
-      className="relative flex flex-col h-full bg-zinc-50 dark:bg-suno-panel w-full overflow-y-auto custom-scrollbar transition-colors duration-300 pb-[calc(env(safe-area-inset-bottom)_+_3.5rem)] md:pb-0"
+      className="relative flex flex-col h-full bg-zinc-50 dark:bg-suno-panel w-full overflow-y-auto custom-scrollbar transition-colors duration-300 pb-[calc(env(safe-area-inset-bottom)_+_8.5rem)] md:pb-0"
       onDrop={handleWorkspaceDrop}
       onDragOver={handleWorkspaceDragOver}
     >
