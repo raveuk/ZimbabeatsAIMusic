@@ -3322,7 +3322,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           the button SITS ABOVE the tab bar instead of underneath it.
           Desktop keeps bottom-0 because the desktop layout has no fixed
           bottom nav to clear. */}
-      <div className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)_+_4rem)] md:pb-4 mt-auto sticky bottom-0 bg-zinc-50 dark:bg-suno-panel z-50 border-t border-zinc-200 dark:border-white/5 space-y-3">
+      <div className="px-4 py-3 md:py-4 mt-auto sticky bottom-0 bg-zinc-50 dark:bg-suno-panel z-50 border-t border-zinc-200 dark:border-white/5 space-y-3">
         <button
           onClick={handleGenerate}
           className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110 disabled:opacity-50"

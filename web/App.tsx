@@ -1065,6 +1065,24 @@ function AppContent() {
       setIsPlaying(true);
       setSongs(prev => prev.map(s => s.id === song.id ? updatedSong : s));
       songsApi.trackPlay(song.id, token).catch(err => console.error('Failed to track play:', err));
+      // Mobile autoplay policy: kick off playback synchronously INSIDE this
+      // click gesture. If we leave it to the playback effect (which reacts to
+      // state) mobile browsers treat play() as programmatic and block it with
+      // NotAllowedError, so the song never starts and the button never flips
+      // to pause. Priming src + calling play() here, within the user gesture,
+      // unlocks audio on phones. We set currentSongIdRef so the effect sees the
+      // src is already loaded and doesn't reload it.
+      const audio = audioRef.current;
+      if (audio && song.audioUrl) {
+        try {
+          if (currentSongIdRef.current !== song.id) {
+            currentSongIdRef.current = song.id;
+            audio.src = song.audioUrl;
+            audio.load();
+          }
+          audio.play().catch(() => {});
+        } catch { /* effect will retry */ }
+      }
     } else {
       togglePlay();
     }
@@ -1628,16 +1646,12 @@ function AppContent() {
         </main>
       </div>
 
-      {/* Mobile bottom tab bar — primary nav on phones. Sits above the
-          Player when one is visible; otherwise pinned to the bottom edge. */}
-      <MobileBottomNav
-        currentView={currentView}
-        onNavigate={navigateTo}
-        username={user?.username}
-        avatarUrl={user?.avatar_url}
-        hasPlayer={!!currentSong}
-      />
-
+      {/* Bottom chrome is now in NORMAL FLOW (not fixed) so it never overlaps
+          content and never leaves a gap. Order matters: Player first, then the
+          mobile tab bar — so on phones the mini-player sits directly above the
+          tab bar (Spotify-style), and the scrollable content above shrinks to
+          fit. On desktop both the header and MobileBottomNav are md:hidden, so
+          only the Player shows at the bottom as before. */}
       <Player
         currentSong={currentSong}
         isPlaying={isPlaying}
@@ -1664,6 +1678,14 @@ function AppContent() {
         onAddToPlaylist={() => currentSong && openAddToPlaylistModal(currentSong)}
         onDelete={() => currentSong && handleDeleteSong(currentSong)}
         onPlayFirst={playFirst}
+      />
+
+      <MobileBottomNav
+        currentView={currentView}
+        onNavigate={navigateTo}
+        username={user?.username}
+        avatarUrl={user?.avatar_url}
+        hasPlayer={!!currentSong}
       />
 
       <CreatePlaylistModal

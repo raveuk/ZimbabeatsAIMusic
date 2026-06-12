@@ -43,8 +43,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <nav
       className={`
-        fixed inset-x-0 z-40
-        ${hasPlayer ? 'bottom-20' : 'bottom-0'}
+        flex-shrink-0 z-40
         md:hidden
         bg-white dark:bg-zinc-950
         border-t border-zinc-200 dark:border-white/10

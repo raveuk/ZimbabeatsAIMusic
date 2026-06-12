@@ -130,7 +130,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 
                                 <div className="flex-1 min-w-0">
                                     <div className="text-zinc-900 dark:text-white font-medium truncate">{song.title}</div>
-                                    <div className="text-zinc-500 dark:text-zinc-400 text-xs">{song.style}</div>
+                                    <div className="text-zinc-500 dark:text-zinc-400 text-xs truncate">{song.style}</div>
                                 </div>
                                 
                                 <div className="text-zinc-500 dark:text-zinc-400 text-sm font-mono">{song.duration}</div>
@@ -197,7 +197,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 
                                 <div className="flex-1 min-w-0">
                                     <div className="text-zinc-900 dark:text-white font-medium truncate">{song.title}</div>
-                                    <div className="text-zinc-500 dark:text-zinc-400 text-xs">{song.style}</div>
+                                    <div className="text-zinc-500 dark:text-zinc-400 text-xs truncate">{song.style}</div>
                                 </div>
                                 
                                 <div className="text-zinc-500 dark:text-zinc-400 text-sm font-mono">{song.duration}</div>
