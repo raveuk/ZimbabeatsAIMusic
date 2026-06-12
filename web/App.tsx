@@ -1585,6 +1585,14 @@ function AppContent() {
   // MobileBottomNav (phone) so the URL pushState + view switch are
   // consistent across both chromes.
   const navigateTo = (v: string) => {
+    // "Profile" tab opens Settings as an OVERLAY without changing the current
+    // view. (Previously it set currentView='profile' first, which rendered a
+    // blank profile page underneath — so closing Settings left the user on a
+    // white blank screen.) Handle it before setCurrentView and return early.
+    if (v === 'profile') {
+      setShowSettingsModal(true);
+      return;
+    }
     setCurrentView(v as any);
     if (v === 'create') {
       setMobileShowList(false);
@@ -1595,11 +1603,6 @@ function AppContent() {
       window.history.pushState({}, '', '/search');
     } else if (v === 'news') {
       window.history.pushState({}, '', '/news');
-    } else if (v === 'profile') {
-      // "Profile" tab in mobile nav — opens Settings for now; once we have a
-      // dedicated mobile profile page this can route there instead.
-      setShowSettingsModal(true);
-      return;
     }
     if (isMobile) setShowLeftSidebar(false);
   };
