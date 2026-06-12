@@ -1608,7 +1608,10 @@ function AppContent() {
   };
 
   return (
-    <div className="flex flex-col h-screen h-[100dvh] bg-white dark:bg-suno-DEFAULT text-zinc-900 dark:text-white font-sans antialiased selection:bg-pink-500/30 transition-colors duration-300">
+    <div
+      className="flex flex-col h-screen bg-white dark:bg-suno-DEFAULT text-zinc-900 dark:text-white font-sans antialiased selection:bg-pink-500/30 transition-colors duration-300"
+      style={{ height: '100dvh' }}
+    >
       {/* Mobile-only top header. Hidden on md+ where the Sidebar's brand
           block covers the same job. */}
       <MobileHeader
