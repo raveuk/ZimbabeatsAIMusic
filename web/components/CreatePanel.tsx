@@ -1257,7 +1257,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   return (
     <div
-      className="relative flex flex-col h-full bg-zinc-50 dark:bg-suno-panel w-full overflow-y-auto custom-scrollbar transition-colors duration-300 pb-[calc(env(safe-area-inset-bottom)_+_8.5rem)] md:pb-0"
+      className="relative flex flex-col h-full bg-zinc-50 dark:bg-suno-panel w-full overflow-y-auto custom-scrollbar transition-colors duration-300"
       onDrop={handleWorkspaceDrop}
       onDragOver={handleWorkspaceDragOver}
     >
@@ -1283,7 +1283,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           </div>
         </div>
       )}
-      <div className="p-4 pt-14 md:pt-4 pb-24 lg:pb-32 space-y-5">
+      <div className="p-3 md:p-4 pt-14 md:pt-4 pb-4 md:pb-6 space-y-3 md:space-y-5">
         <input
           ref={referenceInputRef}
           type="file"
@@ -2142,7 +2142,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             </button>
 
             {showLoraPanel && (
-              <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
+              <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-3 md:p-4 space-y-3 md:space-y-4">
                 {/* Trained LoRA picker — the ONLY wired LoRA path. Selecting a
                     LoRA here forwards loraName (when Use LoRA is on), and the
                     backend injects a LoraLoaderModelOnly node into the graph
@@ -2210,7 +2210,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         )}
 
         {/* MUSIC PARAMETERS */}
-        <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
+        <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-3 md:p-4 space-y-3 md:space-y-4">
           <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-2">
             <Sliders size={14} />
             {t('musicParameters')}
@@ -2272,7 +2272,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         </button>
 
         {showAdvanced && (
-          <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
+          <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-3 md:p-4 space-y-3 md:space-y-4">
             {/* Load Parameters from JSON */}
             <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-zinc-300 dark:border-white/15 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors">
               <Upload size={14} />
@@ -2493,7 +2493,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             </button>
 
             {showLmParams && (
-              <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
+              <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-3 md:p-4 space-y-3 md:space-y-4">
                 {/* LM Temperature */}
                 <EditableSlider
                   label={t('lmTemperature')}
@@ -3322,7 +3322,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           the button SITS ABOVE the tab bar instead of underneath it.
           Desktop keeps bottom-0 because the desktop layout has no fixed
           bottom nav to clear. */}
-      <div className="p-4 mt-auto sticky bottom-[calc(env(safe-area-inset-bottom)_+_3.5rem)] md:bottom-0 bg-zinc-50/95 dark:bg-suno-panel/95 backdrop-blur-sm z-50 border-t border-zinc-200 dark:border-white/5 space-y-3">
+      <div className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)_+_4rem)] md:pb-4 mt-auto sticky bottom-0 bg-zinc-50 dark:bg-suno-panel z-50 border-t border-zinc-200 dark:border-white/5 space-y-3">
         <button
           onClick={handleGenerate}
           className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110 disabled:opacity-50"
