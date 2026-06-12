@@ -274,7 +274,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   // Default 'sde' maps to euler_ancestral, the template's sampler. (Was 'ode'
   // while unwired; now that it drives KSampler.sampler_name, the default must
   // match the template so existing behaviour is unchanged until the user picks.)
-  const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('sde');
+  const [inferMethod, setInferMethod] = useState<'ode' | 'sde' | 'dpmpp_2m'>('sde');
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>('pt');
   // LM Model dropdown is hydrated from /api/models (which reads the live
   // workflow JSON on the backend). lmModel holds the user's pick; if the
@@ -2378,11 +2378,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" title="Deterministic is more repeatable; stochastic adds randomness.">{t('inferMethod')}</label>
                 <select
                   value={inferMethod}
-                  onChange={(e) => setInferMethod(e.target.value as 'ode' | 'sde')}
+                  onChange={(e) => setInferMethod(e.target.value as 'ode' | 'sde' | 'dpmpp_2m')}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-xl px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                 >
                   <option value="ode">{t('odeDeterministic')}</option>
                   <option value="sde">{t('sdeStochastic')}</option>
+                  <option value="dpmpp_2m">DPM++ 2M</option>
                 </select>
               </div>
             </div>

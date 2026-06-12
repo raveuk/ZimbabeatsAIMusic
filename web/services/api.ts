@@ -640,7 +640,7 @@ export interface GenerationParams {
   // MP3 bitrate (only relevant when audioFormat is mp3). Forwarded to ACE-Step's
   // SaveAudioMP3 node as `quality`. V0 = best VBR; 320k = max CBR; 128k = small.
   mp3Quality?: 'V0' | '128k' | '320k';
-  inferMethod?: 'ode' | 'sde';
+  inferMethod?: 'ode' | 'sde' | 'dpmpp_2m';
   shift?: number;
 
   // LM Parameters
@@ -763,7 +763,7 @@ function toBackendBody(p: GenerationParams) {
     guidanceScale:  typeof p.guidanceScale === 'number' && p.guidanceScale > 0 ? p.guidanceScale : undefined,
     // ODE/SDE → KSampler.sampler_name (euler vs euler_ancestral). Previously
     // not forwarded. Now wired so the toggle actually changes the sampler.
-    inferMethod:    p.inferMethod === 'ode' || p.inferMethod === 'sde' ? p.inferMethod : undefined,
+    inferMethod:    (p.inferMethod === 'ode' || p.inferMethod === 'sde' || p.inferMethod === 'dpmpp_2m') ? p.inferMethod : undefined,
     // Negative prompt: deliberately NOT forwarded. The graph rewrite that
     // routed a second TextEncode into KSampler.negative caused reproducible
     // distortion on Studio + cfg=5 (tracks #61/#63/#64). See

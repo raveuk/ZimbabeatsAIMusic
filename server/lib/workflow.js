@@ -123,12 +123,14 @@ export function buildGraph(input) {
   }
 
   // Infer method → KSampler.sampler_name. ODE = deterministic (euler),
-  // SDE = stochastic/ancestral (euler_ancestral, the template default). The
-  // toggle used to do nothing; now it picks the sampler.
+  // SDE = stochastic/ancestral (euler_ancestral, the template default),
+  // dpmpp_2m = DPM++ 2M (often cleaner/smoother on the same step count).
   if (input.inferMethod === "ode") {
     g[SAMPLER_NODE].inputs.sampler_name = "euler";
   } else if (input.inferMethod === "sde") {
     g[SAMPLER_NODE].inputs.sampler_name = "euler_ancestral";
+  } else if (input.inferMethod === "dpmpp_2m") {
+    g[SAMPLER_NODE].inputs.sampler_name = "dpmpp_2m";
   }
 
   // Switch the UNET model based on the UI's ditModel selection. The graph
