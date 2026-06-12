@@ -1409,6 +1409,7 @@ function AppContent() {
             onReusePrompt={handleReuse}
             onDeleteSong={handleDeleteSong}
             onTogglePublic={handleTogglePublic}
+            onNavigateToSong={handleNavigateToSong}
             onDeleteReferenceTrack={handleDeleteReferenceTrack}
           />
         );

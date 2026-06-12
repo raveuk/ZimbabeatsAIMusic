@@ -20,6 +20,7 @@ interface LibraryViewProps {
   onReusePrompt?: (song: Song) => void;
   onDeleteSong?: (song: Song) => void;
   onTogglePublic?: (song: Song) => void;
+  onNavigateToSong?: (songId: string) => void;
   onDeleteReferenceTrack?: (trackId: string) => void;
 }
 
@@ -47,6 +48,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     onReusePrompt,
     onDeleteSong,
     onTogglePublic,
+    onNavigateToSong,
     onDeleteReferenceTrack,
 }) => {
     const { t } = useI18n();
@@ -131,7 +133,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 )}
                                 
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-zinc-900 dark:text-white font-medium truncate">{song.title}</div>
+                                    <div
+                                        className="text-zinc-900 dark:text-white font-medium truncate cursor-pointer hover:underline"
+                                        onClick={(e) => { e.stopPropagation(); onNavigateToSong?.(song.id); }}
+                                        title="Open song page"
+                                    >{song.title || 'Untitled'}</div>
                                     <div className="text-zinc-500 dark:text-zinc-400 text-xs truncate">{song.style}</div>
                                 </div>
                                 
@@ -199,7 +205,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 )}
                                 
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-zinc-900 dark:text-white font-medium truncate">{song.title}</div>
+                                    <div
+                                        className="text-zinc-900 dark:text-white font-medium truncate cursor-pointer hover:underline"
+                                        onClick={(e) => { e.stopPropagation(); onNavigateToSong?.(song.id); }}
+                                        title="Open song page"
+                                    >{song.title || 'Untitled'}</div>
                                     <div className="text-zinc-500 dark:text-zinc-400 text-xs truncate">{song.style}</div>
                                 </div>
                                 
