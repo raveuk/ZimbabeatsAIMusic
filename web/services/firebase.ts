@@ -6,7 +6,14 @@ import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyDtkKKVfk6GXixLy9V-z0GjHJgbUTtQYW8',
-  authDomain: 'zimbabeats-music.firebaseapp.com',
+  // Custom auth domain on our own registrable domain (myuzika.com) so the
+  // OAuth redirect handler's cookies are FIRST-PARTY relative to the app at
+  // myuzika.com. With the old zimbabeats-music.firebaseapp.com authDomain,
+  // mobile Chrome blocked those cookies as third-party and signInWithRedirect
+  // never completed. auth.myuzika.com is a Firebase Hosting custom domain
+  // (CNAME -> zimbabeats-music.web.app) serving the real /__/auth/ handler.
+  // Also fixes the consent screen branding (shows auth.myuzika.com, not zimbabeats).
+  authDomain: 'auth.myuzika.com',
   projectId: 'zimbabeats-music',
   storageBucket: 'zimbabeats-music.firebasestorage.app',
   messagingSenderId: '739115993220',
