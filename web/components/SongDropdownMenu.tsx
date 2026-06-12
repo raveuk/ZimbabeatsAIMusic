@@ -13,7 +13,9 @@ import {
     Download,
     FileText,
     Trash2,
-    Share2
+    Share2,
+    Globe,
+    Lock,
 } from 'lucide-react';
 
 interface SongDropdownMenuProps {
@@ -33,6 +35,7 @@ interface SongDropdownMenuProps {
     onDelete?: () => void;
     onUseAsReference?: () => void;
     onCoverSong?: () => void;
+    onTogglePublic?: () => void;
 }
 
 interface MenuItemProps {
@@ -79,7 +82,8 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
     onShare,
     onDelete,
     onUseAsReference,
-    onCoverSong
+    onCoverSong,
+    onTogglePublic,
 }) => {
     const { t } = useI18n();
     const menuRef = useRef<HTMLDivElement>(null);
@@ -272,6 +276,13 @@ export const SongDropdownMenu: React.FC<SongDropdownMenuProps> = ({
             {isOwner && (
                 <>
                     <MenuDivider />
+                    {onTogglePublic && (
+                        <MenuItem
+                            icon={song.isPublic ? <Lock size={14} /> : <Globe size={14} />}
+                            label={song.isPublic ? 'Make Private' : 'Make Public'}
+                            onClick={() => handleAction(onTogglePublic)}
+                        />
+                    )}
                     <MenuItem
                         icon={<Trash2 size={14} />}
                         label={t('deleteSong')}

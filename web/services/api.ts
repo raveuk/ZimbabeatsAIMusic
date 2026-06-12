@@ -205,6 +205,7 @@ interface BackendTrack {
   audioUrl: string | null;
   coverUrl: string | null;
   coverPending: boolean;
+  isPublic?: boolean; // server/lib/tracks.js publicTrack() returns this
 }
 
 // Map our /api/jobs track row to the upstream Song shape. the upstream UI reads
@@ -245,7 +246,7 @@ function toFspeciiSong(t: BackendTrack, currentUser?: User | null): Song {
     key_scale: typeof t.params.key === 'string' ? t.params.key : undefined,
     time_signature: typeof t.params.timesignature === 'string' ? t.params.timesignature : undefined,
     tags: [], // we don't store tag arrays — style string carries everything
-    is_public: false, // we don't expose public sharing yet
+    is_public: !!t.isPublic, // real value from the backend (publicTrack)
     like_count: 0,
     view_count: 0,
     user_id: currentUser?.id,

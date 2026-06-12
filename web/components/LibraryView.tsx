@@ -19,6 +19,7 @@ interface LibraryViewProps {
   onOpenVideo?: (song: Song) => void;
   onReusePrompt?: (song: Song) => void;
   onDeleteSong?: (song: Song) => void;
+  onTogglePublic?: (song: Song) => void;
   onDeleteReferenceTrack?: (trackId: string) => void;
 }
 
@@ -45,6 +46,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     onOpenVideo,
     onReusePrompt,
     onDeleteSong,
+    onTogglePublic,
     onDeleteReferenceTrack,
 }) => {
     const { t } = useI18n();
@@ -153,6 +155,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                         onReusePrompt={() => onReusePrompt?.(song)}
                                         onAddToPlaylist={() => onAddToPlaylist(song)}
                                         onDelete={() => onDeleteSong?.(song)}
+                                        onTogglePublic={() => onTogglePublic?.(song)}
                                         onShare={() => {
                                             setShareModalOpen(true);
                                         }}
@@ -221,6 +224,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                         onReusePrompt={() => onReusePrompt?.(song)}
                                         onAddToPlaylist={() => onAddToPlaylist(song)}
                                         onDelete={() => onDeleteSong?.(song)}
+                                        onTogglePublic={() => onTogglePublic?.(song)}
                                         onShare={() => {
                                             setShareModalOpen(true);
                                         }}

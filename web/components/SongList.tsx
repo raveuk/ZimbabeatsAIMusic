@@ -24,6 +24,7 @@ interface SongListProps {
     onNavigateToProfile?: (username: string) => void;
     onReusePrompt?: (song: Song) => void;
     onDelete?: (song: Song) => void;
+    onTogglePublic?: (song: Song) => void;
     onSongUpdate?: (updatedSong: Song) => void;
     onDeleteMany?: (songs: Song[]) => void;
     onUseAsReference?: (song: Song) => void;
@@ -102,6 +103,7 @@ export const SongList: React.FC<SongListProps> = ({
     onNavigateToProfile,
     onReusePrompt,
     onDelete,
+    onTogglePublic,
     onSongUpdate,
     onDeleteMany,
     onUseAsReference,
@@ -385,6 +387,7 @@ export const SongList: React.FC<SongListProps> = ({
                                     onNavigateToProfile={onNavigateToProfile}
                                     onReusePrompt={() => onReusePrompt?.(item.song)}
                                     onDelete={() => onDelete?.(item.song)}
+                                    onTogglePublic={() => onTogglePublic?.(item.song)}
                                     onSongUpdate={onSongUpdate}
                                     onUseAsReference={() => onUseAsReference?.(item.song)}
                                     onCoverSong={() => onCoverSong?.(item.song)}
@@ -438,6 +441,7 @@ interface SongItemProps {
     onNavigateToProfile?: (username: string) => void;
     onReusePrompt?: () => void;
     onDelete?: () => void;
+    onTogglePublic?: () => void;
     onSongUpdate?: (updatedSong: Song) => void;
     onUseAsReference?: () => void;
     onCoverSong?: () => void;
@@ -462,6 +466,7 @@ const SongItem: React.FC<SongItemProps> = ({
     onNavigateToProfile,
     onReusePrompt,
     onDelete,
+    onTogglePublic,
     onSongUpdate,
     onUseAsReference,
     onCoverSong
@@ -775,6 +780,7 @@ const SongItem: React.FC<SongItemProps> = ({
                                 onReusePrompt={onReusePrompt ? () => onReusePrompt?.(song) : undefined}
                                 onAddToPlaylist={() => onAddToPlaylist?.(song)}
                                 onDelete={() => onDelete?.(song)}
+                                onTogglePublic={onTogglePublic ? () => onTogglePublic?.() : undefined}
                                 onShare={() => setShareModalOpen(true)}
                                 onUseAsReference={() => onUseAsReference?.()}
                                 onCoverSong={() => onCoverSong?.()}

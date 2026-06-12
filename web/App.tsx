@@ -1150,6 +1150,30 @@ function AppContent() {
     handleDeleteSongs([song]);
   };
 
+  // Flip a track public/private. Backend toggles tracks.is_public and returns
+  // the new value; we optimistically flip it in local state so the UI (lock
+  // icon, menu label) updates immediately.
+  const handleTogglePublic = async (song: Song) => {
+    if (!token) return;
+    const newPublic = !song.isPublic;
+    // optimistic
+    setSongs(prev => prev.map(s => s.id === song.id ? { ...s, isPublic: newPublic } : s));
+    setSelectedSong(prev => prev && prev.id === song.id ? { ...prev, isPublic: newPublic } : prev);
+    try {
+      const { isPublic } = await songsApi.togglePrivacy(song.id, token);
+      // reconcile with the server's authoritative value
+      setSongs(prev => prev.map(s => s.id === song.id ? { ...s, isPublic } : s));
+      setSelectedSong(prev => prev && prev.id === song.id ? { ...prev, isPublic } : prev);
+      showToast(isPublic ? 'Track is now public' : 'Track is now private', 'success');
+    } catch (e) {
+      // revert on failure
+      setSongs(prev => prev.map(s => s.id === song.id ? { ...s, isPublic: song.isPublic } : s));
+      setSelectedSong(prev => prev && prev.id === song.id ? { ...prev, isPublic: song.isPublic } : prev);
+      showToast('Failed to update privacy', 'error');
+      console.error('togglePublic failed', e);
+    }
+  };
+
   const handleDeleteSongs = (songsToDelete: Song[]) => {
     if (!token || songsToDelete.length === 0) return;
 
@@ -1384,6 +1408,7 @@ function AppContent() {
             onOpenVideo={openVideoGenerator}
             onReusePrompt={handleReuse}
             onDeleteSong={handleDeleteSong}
+            onTogglePublic={handleTogglePublic}
             onDeleteReferenceTrack={handleDeleteReferenceTrack}
           />
         );
@@ -1526,6 +1551,7 @@ function AppContent() {
                 onUseUploadAsReference={handleUseUploadAsReference}
                 onCoverUpload={handleCoverUpload}
                 onSongUpdate={handleSongUpdate}
+                onTogglePublic={handleTogglePublic}
               />
             </div>
 
