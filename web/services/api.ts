@@ -385,8 +385,11 @@ export const songsApi = {
   getLikedSongs:    async (_token?: string): Promise<{ songs: Song[] }> => ({ songs: [] }),
 
   getSong: async (id: string, _token?: string | null): Promise<{ song: Song }> => {
-    const t = await api<BackendTrack>(`/api/jobs/${encodeURIComponent(id)}`);
-    return { song: toFspeciiSong(t, ctx()) };
+    // GET /api/jobs/[id] returns { track: {...} } (wrapped) — unwrap it.
+    // Treating the whole response as the track gave an undefined id and the
+    // SongProfile page rendered "Song not found".
+    const { track } = await api<{ track: BackendTrack }>(`/api/jobs/${encodeURIComponent(id)}`);
+    return { song: toFspeciiSong(track, ctx()) };
   },
 
   getFullSong: async (id: string, _token?: string | null): Promise<{ song: Song; comments: Comment[] }> => {

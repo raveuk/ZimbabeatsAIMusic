@@ -141,7 +141,7 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-full bg-zinc-50 dark:bg-black">
+            <div className="w-full h-full flex items-center justify-center bg-zinc-50 dark:bg-black">
                 <div className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
                     {t('loadingSong')}
@@ -152,7 +152,7 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
 
     if (!song) {
         return (
-            <div className="flex flex-col items-center justify-center h-full gap-4 bg-zinc-50 dark:bg-black">
+            <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-zinc-50 dark:bg-black">
                 <div className="text-zinc-500 dark:text-zinc-400">{t('songNotFound')}</div>
                 <button onClick={onBack} className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-lg text-zinc-900 dark:text-white transition-colors">
                     {t('goBack')}
